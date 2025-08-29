@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from .forms import UserAdminChangeForm
 from .forms import UserAdminCreationForm
-from .models import User
+from .models import User, OTPVerification
 
 if settings.DJANGO_ADMIN_FORCE_ALLAUTH:
     # Force the `admin` sign in process to go through the `django-allauth` workflow:
@@ -16,12 +16,13 @@ if settings.DJANGO_ADMIN_FORCE_ALLAUTH:
 
 
 @admin.register(User)
-class UserAdmin(auth_admin.UserAdmin):
+class UserAdmin(admin.ModelAdmin):
     form = UserAdminChangeForm
     add_form = UserAdminCreationForm
     fieldsets = (
-        (None, {"fields": ("username", "password")}),
-        (_("Personal info"), {"fields": ("name", "email")}),
+        (None, {"fields": ("phone_number", "password")}),
+        (_("Personal info"), {"fields": ("name", "branch", "position")}),
+        (_("Phone Verification"), {"fields": ("is_phone_verified",)}),
         (
             _("Permissions"),
             {
@@ -29,6 +30,7 @@ class UserAdmin(auth_admin.UserAdmin):
                     "is_active",
                     "is_staff",
                     "is_superuser",
+                    "is_moderator",
                     "groups",
                     "user_permissions",
                 ),
@@ -36,5 +38,25 @@ class UserAdmin(auth_admin.UserAdmin):
         ),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
-    list_display = ["username", "name", "is_superuser"]
-    search_fields = ["name"]
+    add_fieldsets = (
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("phone_number", "name", "branch", "position", "is_moderator", "password1", "password2"),
+            },
+        ),
+    )
+    list_display = ["phone_number", "name", "branch", "position", "is_moderator", "is_phone_verified", "is_superuser"]
+    list_filter = ["is_staff", "is_superuser", "is_active", "is_moderator", "is_phone_verified", "branch"]
+    search_fields = ["name", "phone_number", "branch", "position"]
+    ordering = ["phone_number"]
+
+
+@admin.register(OTPVerification)
+class OTPVerificationAdmin(admin.ModelAdmin):
+    list_display = ["phone_number", "otp_code", "is_verified", "created_at", "expires_at"]
+    list_filter = ["is_verified", "created_at", "expires_at"]
+    search_fields = ["phone_number"]
+    readonly_fields = ["created_at", "expires_at"]
+    ordering = ["-created_at"]

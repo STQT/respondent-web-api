@@ -2,6 +2,9 @@
 # ------------------------------------------------------------------------------
 USE_DOCKER=yes
 IPYTHONDIR=/app/.ipython
+# Database
+# ------------------------------------------------------------------------------
+DATABASE_URL=postgres://fiwBdejApFDzQzfLLWfsVZZqpNmWxPdz:eOpHwY6EjohHCwhDwgn1MeBso9usyLfBnf3gAZLyJCdrO0kMC0NxBDw0T38MVhgS@postgres:5432/apps
 # Redis
 # ------------------------------------------------------------------------------
 REDIS_URL=redis://redis:6379/0

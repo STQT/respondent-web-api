@@ -1,27 +1,56 @@
 from allauth.account.forms import SignupForm
 from allauth.socialaccount.forms import SignupForm as SocialSignupForm
+from django import forms
 from django.contrib.auth import forms as admin_forms
 from django.utils.translation import gettext_lazy as _
 
 from .models import User
 
 
-class UserAdminChangeForm(admin_forms.UserChangeForm):
-    class Meta(admin_forms.UserChangeForm.Meta):  # type: ignore[name-defined]
+class UserAdminChangeForm(forms.ModelForm):
+    """Form for User Change in the Admin Area."""
+    
+    class Meta:
         model = User
+        fields = '__all__'
 
 
-class UserAdminCreationForm(admin_forms.AdminUserCreationForm):
+class UserAdminCreationForm(forms.ModelForm):
     """
     Form for User Creation in the Admin Area.
-    To change user signup, see UserSignupForm and UserSocialSignupForm.
     """
+    password1 = forms.CharField(
+        label=_("Password"),
+        strip=False,
+        widget=forms.PasswordInput,
+    )
+    password2 = forms.CharField(
+        label=_("Password confirmation"),
+        widget=forms.PasswordInput,
+        strip=False,
+        help_text=_("Enter the same password as before, for verification."),
+    )
 
-    class Meta(admin_forms.UserCreationForm.Meta):  # type: ignore[name-defined]
+    class Meta:
         model = User
+        fields = ("phone_number", "name", "branch", "position", "is_moderator")
         error_messages = {
-            "username": {"unique": _("This username has already been taken.")},
+            "phone_number": {"unique": _("This phone number has already been taken.")},
         }
+
+    def clean_password2(self):
+        password1 = self.cleaned_data.get("password1")
+        password2 = self.cleaned_data.get("password2")
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError(_("Passwords don't match"))
+        return password2
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        if commit:
+            user.save()
+        return user
 
 
 class UserSignupForm(SignupForm):

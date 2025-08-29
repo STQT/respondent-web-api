@@ -1,13 +1,40 @@
 from django.conf import settings
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework.routers import SimpleRouter
+from rest_framework_simplejwt.views import TokenRefreshView
 
-from apps.users.api.views import UserViewSet
+from apps.users.api.views import (
+    UserViewSet, 
+    SendOTPView, 
+    VerifyOTPView, 
+    PhoneLoginView,
+    CustomTokenObtainPairView
+)
+from apps.surveys.api.views import (
+    SurveyViewSet,
+    SurveySessionViewSet,
+    CurrentSessionView
+)
 
 router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
 router.register("users", UserViewSet)
-
+router.register("surveys", SurveyViewSet, basename='survey')
+router.register("sessions", SurveySessionViewSet, basename='surveysession')
 
 app_name = "api"
-urlpatterns = router.urls
+urlpatterns = [
+    # Authentication endpoints
+    path("auth/send-otp/", SendOTPView.as_view(), name="send-otp"),
+    path("auth/verify-otp/", VerifyOTPView.as_view(), name="verify-otp"),
+    path("auth/login/", PhoneLoginView.as_view(), name="phone-login"),
+    path("auth/token/", CustomTokenObtainPairView.as_view(), name="token-obtain-pair"),
+    path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    
+    # Survey endpoints
+    path("current-session/", CurrentSessionView.as_view(), name="current-session"),
+    
+    # Include router URLs
+    path("", include(router.urls)),
+]
