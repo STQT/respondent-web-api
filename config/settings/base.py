@@ -349,8 +349,9 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Respondent Web API",
     "DESCRIPTION": "Documentation of API endpoints of Respondent Web",
     "VERSION": "1.0.0",
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
     "SCHEMA_PATH_PREFIX": "/api/",
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 # JWT Configuration
 # ------------------------------------------------------------------------------
