@@ -26,7 +26,13 @@ services:
     command: /start
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8020:5000"
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   postgres:
     build:
@@ -66,6 +72,7 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
+    ports: []
 
   celeryworker:
     <<: *django
@@ -75,6 +82,7 @@ services:
       django-migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    ports: []
 
   celerybeat:
     <<: *django
@@ -84,6 +92,7 @@ services:
       django-migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    ports: []
 
   flower:
     <<: *django
@@ -107,6 +116,6 @@ services:
     volumes:
       - production_django_media:/usr/share/nginx/media:ro
     ports:
-      - '80:80'
-      - '443:443'
+      - '8080:80'
+      - '8443:443'
     restart: unless-stopped

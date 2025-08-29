@@ -1,5 +1,6 @@
 python-slugify==8.0.4  # https://github.com/un33k/python-slugify
 setuptools==69.0.3  # https://github.com/pypa/setuptools
+requests==2.31.0  # https://github.com/psf/requests
 Pillow==11.3.0 # pyup: != 11.2.0  # https://github.com/python-pillow/Pillow
 argon2-cffi==25.1.0  # https://github.com/hynek/argon2_cffi
 whitenoise==6.9.0  # https://github.com/evansd/whitenoise
