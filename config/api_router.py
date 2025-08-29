@@ -16,12 +16,21 @@ from apps.surveys.api.views import (
     SurveySessionViewSet,
     CurrentSessionView
 )
+from apps.surveys.api.moderator_views import (
+    ModeratorUserViewSet,
+    ModeratorSurveyStatsViewSet,
+    ModeratorDashboardView
+)
 
 router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
 router.register("users", UserViewSet)
 router.register("surveys", SurveyViewSet, basename='survey')
 router.register("sessions", SurveySessionViewSet, basename='surveysession')
+
+# Moderator endpoints
+router.register("moderator/users", ModeratorUserViewSet, basename='moderator-user')
+router.register("moderator/surveys", ModeratorSurveyStatsViewSet, basename='moderator-survey')
 
 app_name = "api"
 urlpatterns = [
@@ -34,6 +43,9 @@ urlpatterns = [
     
     # Survey endpoints
     path("current-session/", CurrentSessionView.as_view(), name="current-session"),
+    
+    # Moderator endpoints
+    path("moderator/dashboard/", ModeratorDashboardView.as_view(), name="moderator-dashboard"),
     
     # Include router URLs
     path("", include(router.urls)),

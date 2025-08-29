@@ -190,7 +190,16 @@ class SurveySession(models.Model):
     language = models.CharField(_("Language"), max_length=10, default='uz')
     
     # Moderator approval
-    can_retake = models.BooleanField(_("Can Retake"), default=False)
+    can_retake = models.BooleanField(_("Can Retake"), default=False, help_text=_("Moderator granted permission for retake"))
+    retake_reason = models.TextField(_("Retake Reason"), blank=True, help_text=_("Reason for granting retake permission"))
+    retake_granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='granted_retakes',
+        verbose_name=_("Retake Granted By")
+    )
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL, 
