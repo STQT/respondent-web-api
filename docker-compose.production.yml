@@ -18,14 +18,15 @@ services:
     volumes:
       - production_django_media:/app/apps/media
     depends_on:
-      - postgres
-      - redis
+      django-migrate:
+        condition: service_completed_successfully
     env_file:
       - ./.envs/.production/.django
       - ./.envs/.production/.postgres
-    ports:
-      - '8020:80'
     command: /start
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
 
   postgres:
     build:
@@ -37,31 +38,63 @@ services:
       - production_postgres_data_backups:/backups
     env_file:
       - ./.envs/.production/.postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: docker.io/redis:6
-    
     volumes:
       - production_redis_data:/data
-    
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  django-migrate:
+    <<: *django
+    image: savollar_production_django_migrate
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput --clear"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   celeryworker:
     <<: *django
     image: savollar_production_celeryworker
     command: /start-celeryworker
-    ports: []
+    depends_on:
+      django-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
   celerybeat:
     <<: *django
     image: savollar_production_celerybeat
     command: /start-celerybeat
-    ports: []
+    depends_on:
+      django-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
   flower:
     <<: *django
     image: savollar_production_flower
     command: /start-flower
-    ports: []
+    depends_on:
+      django-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
 
   nginx:
     build:
@@ -69,8 +102,11 @@ services:
       dockerfile: ./compose/production/nginx/Dockerfile
     image: savollar_production_nginx
     depends_on:
-      - django
+      django:
+        condition: service_started
     volumes:
       - production_django_media:/usr/share/nginx/media:ro
     ports:
-      - '8021:80'
+      - '80:80'
+      - '443:443'
+    restart: unless-stopped
