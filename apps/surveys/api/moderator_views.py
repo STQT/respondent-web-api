@@ -58,13 +58,49 @@ from .moderator_serializers import (
                 enum=['active', 'completed', 'never_started']
             )
         ],
-        responses={200: "ModeratorUserListSerializer"}
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "phone_number": {"type": "string"},
+                        "name": {"type": "string"},
+                        "branch": {"type": "string"},
+                        "position": {"type": "string"},
+                        "last_survey_attempt": {"type": "string", "format": "date-time", "nullable": True},
+                        "total_attempts": {"type": "integer"},
+                        "best_score": {"type": "number", "nullable": True},
+                        "status": {"type": "string"},
+                        "is_phone_verified": {"type": "boolean"},
+                        "date_joined": {"type": "string", "format": "date-time"}
+                    }
+                }
+            }
+        }
     ),
     retrieve=extend_schema(
         summary="Детали пользователя (модератор)",
         description="Получить подробную информацию о пользователе с историей опросов.",
         tags=["Модераторы"],
-        responses={200: "ModeratorUserDetailSerializer"}
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "phone_number": {"type": "string"},
+                    "name": {"type": "string"},
+                    "branch": {"type": "string"},
+                    "position": {"type": "string"},
+                    "is_phone_verified": {"type": "boolean"},
+                    "date_joined": {"type": "string", "format": "date-time"},
+                    "last_login": {"type": "string", "format": "date-time", "nullable": True},
+                    "survey_history": {"type": "array", "items": {"type": "object"}},
+                    "total_statistics": {"type": "object"}
+                }
+            }
+        }
     )
 )
 class ModeratorUserViewSet(ReadOnlyModelViewSet):
@@ -126,7 +162,23 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
         summary="Обзор пользователей",
         description="Получить краткий обзор всех пользователей для панели модератора.",
         tags=["Модераторы"],
-        responses={200: "ModeratorUserOverviewSerializer"}
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "branch": {"type": "string"},
+                        "position": {"type": "string"},
+                        "last_score": {"type": "number", "nullable": True},
+                        "attempts_count": {"type": "integer"},
+                        "status": {"type": "string"}
+                    }
+                }
+            }
+        }
     )
     @action(detail=False, methods=['get'])
     def overview(self, request):
@@ -141,7 +193,14 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
         
         Используется когда пользователь исчерпал лимит попыток.""",
         tags=["Модераторы"],
-        request="RetakePermissionSerializer",
+        request={
+            "type": "object",
+            "properties": {
+                "survey_id": {"type": "integer"},
+                "reason": {"type": "string", "maxLength": 500}
+            },
+            "required": ["survey_id"]
+        },
         responses={
             200: {
                 "type": "object",
@@ -228,12 +287,43 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                     "type": "object",
                     "properties": {
                         "id": {"type": "string", "format": "uuid"},
-                        "survey": {"type": "object"},
+                        "survey": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "title": {"type": "string"}
+                            }
+                        },
                         "attempt_number": {"type": "integer"},
                         "status": {"type": "string"},
                         "score": {"type": "integer"},
                         "percentage": {"type": "number"},
-                        "answers": {"type": "array"}
+                        "answers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "question_id": {"type": "integer"},
+                                    "question_text": {"type": "string"},
+                                    "question_type": {"type": "string"},
+                                    "points_earned": {"type": "integer"},
+                                    "max_points": {"type": "integer"},
+                                    "is_correct": {"type": "boolean"},
+                                    "text_answer": {"type": "string"},
+                                    "selected_choices": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {"type": "integer"},
+                                                "text": {"type": "string"},
+                                                "is_correct": {"type": "boolean"}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -308,13 +398,48 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
         summary="Статистика опросов",
         description="Получить статистику по всем активным опросам.",
         tags=["Модераторы"],
-        responses={200: "SurveyStatisticsSerializer"}
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "passing_score": {"type": "integer"},
+                        "total_participants": {"type": "integer"},
+                        "completed_attempts": {"type": "integer"},
+                        "average_score": {"type": "number", "nullable": True},
+                        "pass_rate": {"type": "number", "nullable": True},
+                        "average_duration": {"type": "integer", "nullable": True},
+                        "created_at": {"type": "string", "format": "date-time"}
+                    }
+                }
+            }
+        }
     ),
     retrieve=extend_schema(
         summary="Детальная статистика опроса",
         description="Получить детальную статистику конкретного опроса.",
         tags=["Модераторы"],
-        responses={200: "SurveyStatisticsSerializer"}
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                    "passing_score": {"type": "integer"},
+                    "total_participants": {"type": "integer"},
+                    "completed_attempts": {"type": "integer"},
+                    "average_score": {"type": "number", "nullable": True},
+                    "pass_rate": {"type": "number", "nullable": True},
+                    "average_duration": {"type": "integer", "nullable": True},
+                    "created_at": {"type": "string", "format": "date-time"}
+                }
+            }
+        }
     )
 )
 class ModeratorSurveyStatsViewSet(ReadOnlyModelViewSet):
@@ -337,7 +462,7 @@ class ModeratorSurveyStatsViewSet(ReadOnlyModelViewSet):
             200: {
                 "type": "object",
                 "properties": {
-                    "survey": {"$ref": "#/components/schemas/SurveyStatistics"},
+                    "survey": {"type": "object"},
                     "results": {
                         "type": "array",
                         "items": {

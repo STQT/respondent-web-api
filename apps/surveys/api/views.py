@@ -39,7 +39,26 @@ from .serializers import (
                 default='uz'
             )
         ],
-        responses={200: "SurveyListSerializer"}
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "time_limit_minutes": {"type": "integer"},
+                        "questions_count": {"type": "integer"},
+                        "passing_score": {"type": "integer"},
+                        "max_attempts": {"type": "integer"},
+                        "total_questions": {"type": "integer"},
+                        "user_attempts": {"type": "integer"},
+                        "can_start": {"type": "boolean"}
+                    }
+                }
+            }
+        }
     ),
     retrieve=extend_schema(
         summary="Детали опроса",
@@ -55,7 +74,21 @@ from .serializers import (
                 default='uz'
             )
         ],
-        responses={200: "SurveyDetailSerializer"}
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                    "time_limit_minutes": {"type": "integer"},
+                    "questions_count": {"type": "integer"},
+                    "passing_score": {"type": "integer"},
+                    "max_attempts": {"type": "integer"},
+                    "total_questions": {"type": "integer"}
+                }
+            }
+        }
     )
 )
 class SurveyViewSet(ReadOnlyModelViewSet):
@@ -86,9 +119,33 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         Создает новую сессию и инициализирует случайные вопросы для прохождения.
         Пользователь может указать количество вопросов и язык.""",
         tags=["Опросы"],
-        request="StartSurveySerializer",
+        request={
+            "type": "object",
+            "properties": {
+                "questions_count": {"type": "integer", "minimum": 1, "maximum": 100},
+                "language": {"type": "string", "enum": ["uz", "uz-cyrl", "ru"], "default": "uz"}
+            }
+        },
         responses={
-            201: "SurveySessionSerializer",
+            201: {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "survey": {"type": "object"},
+                    "status": {"type": "string"},
+                    "attempt_number": {"type": "integer"},
+                    "started_at": {"type": "string", "format": "date-time"},
+                    "expires_at": {"type": "string", "format": "date-time"},
+                    "language": {"type": "string"},
+                    "progress": {"type": "object"},
+                    "time_remaining": {"type": "integer"},
+                    "current_question": {"type": "object", "nullable": True},
+                    "score": {"type": "integer", "nullable": True},
+                    "total_points": {"type": "integer", "nullable": True},
+                    "percentage": {"type": "number", "nullable": True},
+                    "is_passed": {"type": "boolean", "nullable": True}
+                }
+            },
             400: {
                 "type": "object",
                 "properties": {
@@ -180,7 +237,24 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         summary="Моя история опросов",
         description="Получить историю прохождения опросов текущим пользователем.",
         tags=["Опросы"],
-        responses={200: "UserSurveyHistorySerializer"}
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "survey": {"type": "object"},
+                        "total_attempts": {"type": "integer"},
+                        "best_score": {"type": "integer", "nullable": True},
+                        "best_percentage": {"type": "number", "nullable": True},
+                        "last_attempt_at": {"type": "string", "format": "date-time"},
+                        "is_passed": {"type": "boolean"},
+                        "current_status": {"type": "string"},
+                        "can_continue": {"type": "boolean"}
+                    }
+                }
+            }
+        }
     )
     @action(detail=False, methods=['get'])
     def my_history(self, request):
@@ -195,7 +269,27 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         summary="Детали сессии",
         description="Получить подробную информацию о сессии прохождения опроса.",
         tags=["Сессии"],
-        responses={200: "SurveySessionSerializer"}
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "survey": {"type": "object"},
+                    "status": {"type": "string"},
+                    "attempt_number": {"type": "integer"},
+                    "started_at": {"type": "string", "format": "date-time"},
+                    "expires_at": {"type": "string", "format": "date-time"},
+                    "language": {"type": "string"},
+                    "progress": {"type": "object"},
+                    "time_remaining": {"type": "integer"},
+                    "current_question": {"type": "object", "nullable": True},
+                    "score": {"type": "integer", "nullable": True},
+                    "total_points": {"type": "integer", "nullable": True},
+                    "percentage": {"type": "number", "nullable": True},
+                    "is_passed": {"type": "boolean", "nullable": True}
+                }
+            }
+        }
     )
 )
 class SurveySessionViewSet(GenericViewSet):
@@ -227,13 +321,21 @@ class SurveySessionViewSet(GenericViewSet):
         Поддерживает различные типы вопросов: один вариант, множественный выбор, открытый ответ.
         Автоматически завершает сессию при ответе на последний вопрос.""",
         tags=["Сессии"],
-        request="SubmitAnswerSerializer",
+        request={
+            "type": "object",
+            "properties": {
+                "question_id": {"type": "integer"},
+                "choice_ids": {"type": "array", "items": {"type": "integer"}},
+                "text_answer": {"type": "string"}
+            },
+            "required": ["question_id"]
+        },
         responses={
             200: {
                 "type": "object",
                 "properties": {
                     "message": {"type": "string"},
-                    "session": {"$ref": "#/components/schemas/SurveySession"},
+                    "session": {"type": "object"},
                     "final_score": {"type": "object", "description": "Только при завершении сессии"}
                 }
             },
@@ -370,7 +472,7 @@ class SurveySessionViewSet(GenericViewSet):
                 "type": "object",
                 "properties": {
                     "message": {"type": "string", "example": "Session cancelled successfully"},
-                    "session": {"$ref": "#/components/schemas/SurveySession"}
+                    "session": {"type": "object"}
                 }
             },
             400: {
@@ -424,7 +526,7 @@ class SurveySessionViewSet(GenericViewSet):
                         "items": {"type": "object"},
                         "description": "Детальная информация по каждому вопросу"
                     },
-                    "session": {"$ref": "#/components/schemas/SurveySession"}
+                    "session": {"type": "object"}
                 }
             }
         }
