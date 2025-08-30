@@ -236,7 +236,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['phone_number'] = PhoneNumberField(help_text="Номер телефона")
-        del self.fields['username']
+        if 'username' in self.fields:
+            del self.fields['username']
     
     @classmethod
     def get_token(cls, user):
