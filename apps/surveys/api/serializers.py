@@ -1,15 +1,28 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 from apps.surveys.models import (
     Survey, Question, Choice, SurveySession, 
     SessionQuestion, Answer, UserSurveyHistory
 )
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            name="Пример варианта ответа",
+            value={
+                "id": 1,
+                "text": "Правильный ответ",
+                "order": 1
+            }
+        )
+    ]
+)
 class ChoiceSerializer(serializers.ModelSerializer):
     """Serializer for question choices."""
     
-    text = serializers.SerializerMethodField()
+    text = serializers.SerializerMethodField(help_text="Текст варианта ответа")
     
     class Meta:
         model = Choice
@@ -21,11 +34,32 @@ class ChoiceSerializer(serializers.ModelSerializer):
         return obj.get_text(language)
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            name="Пример вопроса",
+            value={
+                "id": 1,
+                "question_type": "single",
+                "text": "Какой язык программирования вы предпочитаете?",
+                "image": None,
+                "video": None,
+                "points": 5,
+                "order": 1,
+                "choices": [
+                    {"id": 1, "text": "Python", "order": 1},
+                    {"id": 2, "text": "JavaScript", "order": 2},
+                    {"id": 3, "text": "Java", "order": 3}
+                ]
+            }
+        )
+    ]
+)
 class QuestionSerializer(serializers.ModelSerializer):
     """Serializer for survey questions."""
     
-    text = serializers.SerializerMethodField()
-    choices = ChoiceSerializer(many=True, read_only=True)
+    text = serializers.SerializerMethodField(help_text="Текст вопроса")
+    choices = ChoiceSerializer(many=True, read_only=True, help_text="Варианты ответов")
     
     class Meta:
         model = Question
@@ -109,12 +143,32 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         return obj.get_total_available_questions()
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            name="Начать опрос с параметрами",
+            value={
+                "questions_count": 10,
+                "language": "ru"
+            }
+        )
+    ]
+)
 class StartSurveySerializer(serializers.Serializer):
     """Serializer for starting a survey session."""
     
-    survey_id = serializers.IntegerField()
-    questions_count = serializers.IntegerField(required=False, min_value=1, max_value=100)
-    language = serializers.ChoiceField(choices=['uz', 'uz-cyrl', 'ru'], default='uz')
+    survey_id = serializers.IntegerField(help_text="ID опроса")
+    questions_count = serializers.IntegerField(
+        required=False, 
+        min_value=1, 
+        max_value=100,
+        help_text="Количество вопросов (опционально)"
+    )
+    language = serializers.ChoiceField(
+        choices=['uz', 'uz-cyrl', 'ru'], 
+        default='uz',
+        help_text="Язык опроса"
+    )
     
     def validate_survey_id(self, value):
         """Validate survey exists and is active."""
@@ -208,17 +262,47 @@ class SurveySessionSerializer(serializers.ModelSerializer):
         return None
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            name="Ответ один вариант",
+            value={
+                "question_id": 1,
+                "choice_ids": [3]
+            }
+        ),
+        OpenApiExample(
+            name="Ответ множественный выбор",
+            value={
+                "question_id": 2,
+                "choice_ids": [5, 7, 9]
+            }
+        ),
+        OpenApiExample(
+            name="Открытый ответ",
+            value={
+                "question_id": 3,
+                "text_answer": "Мой развернутый ответ на вопрос"
+            }
+        )
+    ]
+)
 class SubmitAnswerSerializer(serializers.Serializer):
     """Serializer for submitting answers."""
     
-    session_id = serializers.UUIDField()
-    question_id = serializers.IntegerField()
+    session_id = serializers.UUIDField(help_text="ID сессии")
+    question_id = serializers.IntegerField(help_text="ID вопроса")
     choice_ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
-        allow_empty=True
+        allow_empty=True,
+        help_text="Список ID выбранных вариантов"
     )
-    text_answer = serializers.CharField(required=False, allow_blank=True)
+    text_answer = serializers.CharField(
+        required=False, 
+        allow_blank=True,
+        help_text="Текстовый ответ (для открытых вопросов)"
+    )
     
     def validate(self, attrs):
         """Validate answer submission."""

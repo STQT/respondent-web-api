@@ -7,6 +7,10 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import transaction
+from drf_spectacular.utils import (
+    extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
+)
+from drf_spectacular.types import OpenApiTypes
 
 from apps.surveys.models import (
     Survey, SurveySession, SessionQuestion, Answer, UserSurveyHistory
@@ -18,6 +22,42 @@ from .serializers import (
 )
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="Список опросов",
+        description="""Получить список активных опросов доступных пользователю.
+        
+        Отображает информацию о количестве попыток пользователя и возможности начать новую попытку.""",
+        tags=["Опросы"],
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Язык для отображения (по умолчанию: uz)',
+                enum=['uz', 'uz-cyrl', 'ru'],
+                default='uz'
+            )
+        ],
+        responses={200: "SurveyListSerializer"}
+    ),
+    retrieve=extend_schema(
+        summary="Детали опроса",
+        description="Получить подробную информацию об опросе по ID.",
+        tags=["Опросы"],
+        parameters=[
+            OpenApiParameter(
+                name='lang',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Язык для отображения',
+                enum=['uz', 'uz-cyrl', 'ru'],
+                default='uz'
+            )
+        ],
+        responses={200: "SurveyDetailSerializer"}
+    )
+)
 class SurveyViewSet(ReadOnlyModelViewSet):
     """ViewSet for surveys."""
     
@@ -39,6 +79,38 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         context['language'] = self.request.query_params.get('lang', 'uz')
         return context
     
+    @extend_schema(
+        summary="Начать опрос",
+        description="""Начать новую сессию прохождения опроса.
+        
+        Создает новую сессию и инициализирует случайные вопросы для прохождения.
+        Пользователь может указать количество вопросов и язык.""",
+        tags=["Опросы"],
+        request="StartSurveySerializer",
+        responses={
+            201: "SurveySessionSerializer",
+            400: {
+                "type": "object",
+                "properties": {
+                    "non_field_errors": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "example": ["Maximum attempts reached. Contact moderator for permission to retake."]
+                    }
+                }
+            }
+        },
+        examples=[
+            OpenApiExample(
+                name="Начать опрос с параметрами",
+                request_only=True,
+                value={
+                    "questions_count": 10,
+                    "language": "ru"
+                }
+            )
+        ]
+    )
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         """Start a new survey session."""
@@ -104,6 +176,12 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @extend_schema(
+        summary="Моя история опросов",
+        description="Получить историю прохождения опросов текущим пользователем.",
+        tags=["Опросы"],
+        responses={200: "UserSurveyHistorySerializer"}
+    )
     @action(detail=False, methods=['get'])
     def my_history(self, request):
         """Get user's survey history."""
@@ -112,6 +190,14 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        summary="Детали сессии",
+        description="Получить подробную информацию о сессии прохождения опроса.",
+        tags=["Сессии"],
+        responses={200: "SurveySessionSerializer"}
+    )
+)
 class SurveySessionViewSet(GenericViewSet):
     """ViewSet for survey sessions."""
     
@@ -134,6 +220,61 @@ class SurveySessionViewSet(GenericViewSet):
         serializer = self.get_serializer(session)
         return Response(serializer.data)
     
+    @extend_schema(
+        summary="Отправить ответ",
+        description="""Отправить ответ на вопрос в рамках сессии.
+        
+        Поддерживает различные типы вопросов: один вариант, множественный выбор, открытый ответ.
+        Автоматически завершает сессию при ответе на последний вопрос.""",
+        tags=["Сессии"],
+        request="SubmitAnswerSerializer",
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "session": {"$ref": "#/components/schemas/SurveySession"},
+                    "final_score": {"type": "object", "description": "Только при завершении сессии"}
+                }
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "non_field_errors": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "example": ["Session has expired"]
+                    }
+                }
+            }
+        },
+        examples=[
+            OpenApiExample(
+                name="Ответ один вариант",
+                request_only=True,
+                value={
+                    "question_id": 1,
+                    "choice_ids": [3]
+                }
+            ),
+            OpenApiExample(
+                name="Ответ множественный выбор",
+                request_only=True,
+                value={
+                    "question_id": 2,
+                    "choice_ids": [5, 7, 9]
+                }
+            ),
+            OpenApiExample(
+                name="Открытый ответ",
+                request_only=True,
+                value={
+                    "question_id": 3,
+                    "text_answer": "Мой развернутый ответ на вопрос"
+                }
+            )
+        ]
+    )
     @action(detail=True, methods=['post'])
     def submit_answer(self, request, pk=None):
         """Submit an answer for a question."""
@@ -220,6 +361,26 @@ class SurveySessionViewSet(GenericViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @extend_schema(
+        summary="Отменить сессию",
+        description="Отменить активную сессию прохождения опроса.",
+        tags=["Сессии"],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "example": "Session cancelled successfully"},
+                    "session": {"$ref": "#/components/schemas/SurveySession"}
+                }
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "example": "Cannot cancel this session"}
+                }
+            }
+        }
+    )
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         """Cancel active session."""
@@ -247,6 +408,27 @@ class SurveySessionViewSet(GenericViewSet):
             'session': SurveySessionSerializer(session, context={'request': request}).data
         })
     
+    @extend_schema(
+        summary="Прогресс сессии",
+        description="""Получить детальный прогресс прохождения сессии.
+        
+        Возвращает информацию о всех вопросах сессии, ответах и набранных баллах.""",
+        tags=["Сессии"],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "progress": {"type": "object", "description": "Общий прогресс сессии"},
+                    "questions": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Детальная информация по каждому вопросу"
+                    },
+                    "session": {"$ref": "#/components/schemas/SurveySession"}
+                }
+            }
+        }
+    )
     @action(detail=True, methods=['get'])
     def progress(self, request, pk=None):
         """Get session progress and answered questions."""
@@ -283,6 +465,28 @@ class SurveySessionViewSet(GenericViewSet):
         })
 
 
+@extend_schema(
+    summary="Текущая активная сессия",
+    description="""Получить информацию о текущей активной сессии пользователя.
+    
+    Если пользователь сейчас не проходит опрос, возвращает null.
+    Автоматически проверяет срок действия сессии.""",
+    tags=["Сессии"],
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "session": {
+                    "oneOf": [
+                        {"$ref": "#/components/schemas/SurveySession"},
+                        {"type": "null"}
+                    ],
+                    "description": "Информация о сессии или null"
+                }
+            }
+        }
+    }
+)
 class CurrentSessionView(APIView):
     """Get user's current active session."""
     

@@ -347,11 +347,57 @@ CORS_URLS_REGEX = r"^/api/.*$"
 # See more configuration options at https://drf-spectacular.readthedocs.io/en/latest/settings.html#settings
 SPECTACULAR_SETTINGS = {
     "TITLE": "Respondent Web API",
-    "DESCRIPTION": "Documentation of API endpoints of Respondent Web",
+    "DESCRIPTION": """
+    API для веб-приложения проведения опросов и тестирования.
+    
+    ## Основные возможности:
+    - Аутентификация по номеру телефона с OTP
+    - Управление пользователями и модераторами
+    - Создание и прохождение опросов
+    - Детальная статистика и отчеты
+    - Многоязычная поддержка (узбекский, русский)
+    
+    ## Аутентификация:
+    API использует JWT токены для аутентификации. Получить токен можно через эндпоинты:
+    - `/api/auth/send-otp/` - отправка OTP на номер телефона
+    - `/api/auth/verify-otp/` - верификация OTP кода  
+    - `/api/auth/login/` - вход/регистрация с OTP
+    
+    После получения токена добавляйте заголовок: `Authorization: Bearer YOUR_ACCESS_TOKEN`
+    """,
     "VERSION": "1.0.0",
     "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
     "SCHEMA_PATH_PREFIX": "/api/",
     'COMPONENT_SPLIT_REQUEST': True,
+    'COMPONENT_SPLIT_RESPONSE': True,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'defaultModelsExpandDepth': 1,
+        'defaultModelExpandDepth': 1,
+        'filter': True,
+        'tagsSorter': 'alpha',
+        'operationsSorter': 'alpha',
+    },
+    'SWAGGER_UI_FAVICON_HREF': '/static/images/favicons/favicon.ico',
+    'REDOC_UI_SETTINGS': {
+        'hideDownloadButton': False,
+        'expandResponses': '200,201',
+        'pathInMiddlePanel': True,
+    },
+    'PREPROCESSING_HOOKS': [],
+    'POSTPROCESSING_HOOKS': [],
+    'ENUM_NAME_OVERRIDES': {
+        'ValidationErrorEnum': 'apps.common.enums.ValidationErrorEnum',
+    },
+    'TAGS': [
+        {'name': 'Аутентификация', 'description': 'Эндпоинты для аутентификации пользователей'},
+        {'name': 'Пользователи', 'description': 'Управление пользователями'},
+        {'name': 'Опросы', 'description': 'Работа с опросами и тестами'},
+        {'name': 'Сессии', 'description': 'Управление сессиями прохождения опросов'},
+        {'name': 'Модераторы', 'description': 'Функции для модераторов и администраторов'},
+    ],
 }
 # JWT Configuration
 # ------------------------------------------------------------------------------
