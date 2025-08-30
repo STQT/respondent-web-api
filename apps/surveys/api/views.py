@@ -44,6 +44,7 @@ from .serializers import (
                 "type": "array",
                 "items": {
                     "type": "object",
+                    "title": "SurveyList",
                     "properties": {
                         "id": {"type": "integer"},
                         "title": {"type": "string"},
@@ -77,6 +78,7 @@ from .serializers import (
         responses={
             200: {
                 "type": "object",
+                "title": "SurveyDetail",
                 "properties": {
                     "id": {"type": "integer"},
                     "title": {"type": "string"},
@@ -121,6 +123,7 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         tags=["Опросы"],
         request={
             "type": "object",
+            "title": "StartSurveyRequest",
             "properties": {
                 "questions_count": {"type": "integer", "minimum": 1, "maximum": 100},
                 "language": {"type": "string", "enum": ["uz", "uz-cyrl", "ru"], "default": "uz"}
@@ -129,17 +132,18 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         responses={
             201: {
                 "type": "object",
+                "title": "SurveySession",
                 "properties": {
                     "id": {"type": "string", "format": "uuid"},
-                    "survey": {"type": "object"},
+                    "survey": {"type": "object", "title": "Survey"},
                     "status": {"type": "string"},
                     "attempt_number": {"type": "integer"},
                     "started_at": {"type": "string", "format": "date-time"},
                     "expires_at": {"type": "string", "format": "date-time"},
                     "language": {"type": "string"},
-                    "progress": {"type": "object"},
+                    "progress": {"type": "object", "title": "Progress"},
                     "time_remaining": {"type": "integer"},
-                    "current_question": {"type": "object", "nullable": True},
+                    "current_question": {"type": "object", "title": "Question", "nullable": True},
                     "score": {"type": "integer", "nullable": True},
                     "total_points": {"type": "integer", "nullable": True},
                     "percentage": {"type": "number", "nullable": True},
@@ -335,7 +339,7 @@ class SurveySessionViewSet(GenericViewSet):
                 "type": "object",
                 "properties": {
                     "message": {"type": "string"},
-                    "session": {"type": "object"},
+                    "session": {"type": "object", "title": "Session"},
                     "final_score": {"type": "object", "description": "Только при завершении сессии"}
                 }
             },
@@ -472,7 +476,7 @@ class SurveySessionViewSet(GenericViewSet):
                 "type": "object",
                 "properties": {
                     "message": {"type": "string", "example": "Session cancelled successfully"},
-                    "session": {"type": "object"}
+                    "session": {"type": "object", "title": "Session"}
                 }
             },
             400: {
@@ -526,7 +530,7 @@ class SurveySessionViewSet(GenericViewSet):
                         "items": {"type": "object"},
                         "description": "Детальная информация по каждому вопросу"
                     },
-                    "session": {"type": "object"}
+                    "session": {"type": "object", "title": "Session"}
                 }
             }
         }

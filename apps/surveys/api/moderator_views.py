@@ -63,6 +63,7 @@ from .moderator_serializers import (
                 "type": "array",
                 "items": {
                     "type": "object",
+                    "title": "ModeratorUserList",
                     "properties": {
                         "id": {"type": "integer"},
                         "phone_number": {"type": "string"},
@@ -87,6 +88,7 @@ from .moderator_serializers import (
         responses={
             200: {
                 "type": "object",
+                "title": "ModeratorUserDetail",
                 "properties": {
                     "id": {"type": "integer"},
                     "phone_number": {"type": "string"},
@@ -96,8 +98,8 @@ from .moderator_serializers import (
                     "is_phone_verified": {"type": "boolean"},
                     "date_joined": {"type": "string", "format": "date-time"},
                     "last_login": {"type": "string", "format": "date-time", "nullable": True},
-                    "survey_history": {"type": "array", "items": {"type": "object"}},
-                    "total_statistics": {"type": "object"}
+                    "survey_history": {"type": "array", "items": {"type": "object", "title": "SurveyHistoryItem"}},
+                    "total_statistics": {"type": "object", "title": "UserStatistics"}
                 }
             }
         }
@@ -167,6 +169,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                 "type": "array",
                 "items": {
                     "type": "object",
+                    "title": "ModeratorUserOverview",
                     "properties": {
                         "id": {"type": "integer"},
                         "name": {"type": "string"},
@@ -195,6 +198,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
         tags=["Модераторы"],
         request={
             "type": "object",
+            "title": "RetakePermissionRequest",
             "properties": {
                 "survey_id": {"type": "integer"},
                 "reason": {"type": "string", "maxLength": 500}
@@ -289,6 +293,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                         "id": {"type": "string", "format": "uuid"},
                         "survey": {
                             "type": "object",
+                            "title": "SurveyBasic",
                             "properties": {
                                 "id": {"type": "integer"},
                                 "title": {"type": "string"}
@@ -302,6 +307,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                             "type": "array",
                             "items": {
                                 "type": "object",
+                                "title": "DetailedAnswer",
                                 "properties": {
                                     "question_id": {"type": "integer"},
                                     "question_text": {"type": "string"},
@@ -314,6 +320,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                                         "type": "array",
                                         "items": {
                                             "type": "object",
+                                            "title": "ChoiceDetail",
                                             "properties": {
                                                 "id": {"type": "integer"},
                                                 "text": {"type": "string"},
@@ -403,6 +410,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                 "type": "array",
                 "items": {
                     "type": "object",
+                    "title": "SurveyStatisticsItem",
                     "properties": {
                         "id": {"type": "integer"},
                         "title": {"type": "string"},
@@ -426,6 +434,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
         responses={
             200: {
                 "type": "object",
+                "title": "SurveyStatisticsDetail",
                 "properties": {
                     "id": {"type": "integer"},
                     "title": {"type": "string"},
@@ -462,14 +471,15 @@ class ModeratorSurveyStatsViewSet(ReadOnlyModelViewSet):
             200: {
                 "type": "object",
                 "properties": {
-                    "survey": {"type": "object"},
+                    "survey": {"type": "object", "title": "SurveyStatistics"},
                     "results": {
                         "type": "array",
                         "items": {
                             "type": "object",
+                            "title": "DetailedResult",
                             "properties": {
                                 "session_id": {"type": "string"},
-                                "user": {"type": "object"},
+                                "user": {"type": "object", "title": "UserBasic"},
                                 "score": {"type": "integer"},
                                 "percentage": {"type": "number"},
                                 "is_passed": {"type": "boolean"}
@@ -528,6 +538,7 @@ class ModeratorSurveyStatsViewSet(ReadOnlyModelViewSet):
         responses={
             200: {
                 "type": "object",
+                "title": "DashboardStats",
                 "properties": {
                     "total_users": {"type": "integer", "description": "Общее количество пользователей"},
                     "active_users": {"type": "integer", "description": "Количество активных пользователей"},
@@ -608,20 +619,21 @@ class ModeratorSurveyStatsViewSet(ReadOnlyModelViewSet):
     responses={
         200: {
             "type": "object",
+            "title": "ModeratorDashboard",
             "properties": {
                 "recent_activity": {
                     "type": "array",
-                    "items": {"type": "object"},
+                    "items": {"type": "object", "title": "RecentActivity"},
                     "description": "Последняя активность"
                 },
                 "top_performers": {
                     "type": "array",
-                    "items": {"type": "object"},
+                    "items": {"type": "object", "title": "TopPerformer"},
                     "description": "Лучшие пользователи"
                 },
                 "surveys_needing_attention": {
                     "type": "array",
-                    "items": {"type": "object"},
+                    "items": {"type": "object", "title": "SurveyAttention"},
                     "description": "Опросы, требующие внимания"
                 }
             }
