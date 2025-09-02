@@ -328,14 +328,16 @@ class SurveySessionViewSet(GenericViewSet):
         
         Поддерживает различные типы вопросов: один вариант, множественный выбор, открытый ответ.
         Позволяет обновлять уже данные ответы, если пользователь передумал.
-        Автоматически завершает сессию при ответе на последний вопрос.""",
+        Автоматически завершает сессию при ответе на последний вопрос.
+        Поддерживает принудительное завершение опроса.""",
         tags=["Сессии"],
         request={
             "type": "object",
             "properties": {
                 "question_id": {"type": "integer"},
                 "choice_ids": {"type": "array", "items": {"type": "integer"}},
-                "text_answer": {"type": "string"}
+                "text_answer": {"type": "string"},
+                "force_finish": {"type": "boolean", "description": "Принудительно завершить опрос после этого ответа"}
             },
             "required": ["question_id"]
         },
@@ -391,6 +393,15 @@ class SurveySessionViewSet(GenericViewSet):
                     "question_id": 1,
                     "choice_ids": [4]  # Изменен выбор с [3] на [4]
                 }
+            ),
+            OpenApiExample(
+                name="Принудительное завершение",
+                request_only=True,
+                value={
+                    "question_id": 5,
+                    "choice_ids": [2],
+                    "force_finish": True
+                }
             )
         ]
     )
@@ -404,7 +415,8 @@ class SurveySessionViewSet(GenericViewSet):
                 'session_id': session.id,
                 'question_id': request.data.get('question_id'),
                 'choice_ids': request.data.get('choice_ids', []),
-                'text_answer': request.data.get('text_answer', '')
+                'text_answer': request.data.get('text_answer', ''),
+                'force_finish': request.data.get('force_finish', False)
             },
             context={'request': request}
         )
@@ -446,10 +458,11 @@ class SurveySessionViewSet(GenericViewSet):
                 session_question.points_earned = points_earned
                 session_question.save()
                 
-                # Check if all questions are answered
+                # Check if user wants to force finish or all questions are answered
+                force_finish = validated_data.get('force_finish', False)
                 remaining_questions = session.sessionquestion_set.filter(is_answered=False).count()
                 
-                if remaining_questions == 0:
+                if force_finish or remaining_questions == 0:
                     # Complete session
                     session.status = 'completed'
                     session.completed_at = timezone.now()
@@ -459,22 +472,39 @@ class SurveySessionViewSet(GenericViewSet):
                     final_score = session.calculate_final_score()
                     
                     # Update user history
-                    history = UserSurveyHistory.objects.get(user=request.user, survey=session.survey)
-                    history.current_status = 'completed'
+                    try:
+                        history = UserSurveyHistory.objects.get(user=request.user, survey=session.survey)
+                        history.current_status = 'completed'
+                        
+                        if not history.best_score or session.score > history.best_score:
+                            history.best_score = session.score
+                            history.best_percentage = session.percentage
+                        
+                        if session.is_passed:
+                            history.is_passed = True
+                        
+                        history.save()
+                    except UserSurveyHistory.DoesNotExist:
+                        pass
                     
-                    if not history.best_score or session.score > history.best_score:
-                        history.best_score = session.score
-                        history.best_percentage = session.percentage
+                    # Get completion statistics
+                    total_questions = session.sessionquestion_set.count()
+                    answered_questions = session.sessionquestion_set.filter(is_answered=True).count()
+                    completion_percentage = (answered_questions / total_questions * 100) if total_questions > 0 else 0
                     
-                    if session.is_passed:
-                        history.is_passed = True
+                    completion_stats = {
+                        'total_questions': total_questions,
+                        'answered_questions': answered_questions,
+                        'unanswered_questions': remaining_questions,
+                        'completion_percentage': round(completion_percentage, 2)
+                    }
                     
-                    history.save()
-                    
+                    message = _('Survey completed') if remaining_questions == 0 else _('Survey finished by user request')
                     return Response({
-                        'message': _('Survey completed'),
+                        'message': message,
                         'session': SurveySessionSerializer(session, context={'request': request}).data,
-                        'final_score': final_score
+                        'final_score': final_score,
+                        'completion_stats': completion_stats
                     })
                 
                 message = _('Answer updated successfully') if not created else _('Answer submitted successfully')
@@ -532,6 +562,104 @@ class SurveySessionViewSet(GenericViewSet):
             'session': SurveySessionSerializer(session, context={'request': request}).data
         })
     
+    @extend_schema(
+        summary="Завершить опрос",
+        description="""Принудительно завершить опрос и рассчитать финальный результат.
+        
+        Завершает сессию независимо от количества отвеченных вопросов.
+        Рассчитывает финальный балл на основе отвеченных вопросов.
+        Обновляет историю пользователя.""",
+        tags=["Сессии"],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "example": "Survey finished successfully"},
+                    "session": {"type": "object", "title": "Session"},
+                    "final_score": {"type": "object", "description": "Финальный результат опроса"},
+                    "completion_stats": {
+                        "type": "object",
+                        "properties": {
+                            "total_questions": {"type": "integer", "description": "Общее количество вопросов"},
+                            "answered_questions": {"type": "integer", "description": "Количество отвеченных вопросов"},
+                            "unanswered_questions": {"type": "integer", "description": "Количество неотвеченных вопросов"},
+                            "completion_percentage": {"type": "number", "description": "Процент завершения"}
+                        }
+                    }
+                }
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "example": "Cannot finish this session"}
+                }
+            }
+        }
+    )
+    @action(detail=True, methods=['post'])
+    def finish(self, request, pk=None):
+        """Finish survey session and calculate final results."""
+        session = get_object_or_404(self.get_queryset(), pk=pk)
+        
+        # Check if session can be finished
+        if session.status not in ['started', 'in_progress']:
+            return Response(
+                {'error': _('Cannot finish this session')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        with transaction.atomic():
+            # Mark all unanswered questions as skipped (optional)
+            # This could be useful for analytics
+            unanswered_questions = session.sessionquestion_set.filter(is_answered=False)
+            unanswered_count = unanswered_questions.count()
+            
+            # Complete the session
+            session.status = 'completed'
+            session.completed_at = timezone.now()
+            session.save()
+            
+            # Calculate final score based on answered questions
+            final_score = session.calculate_final_score()
+            
+            # Get completion statistics
+            total_questions = session.sessionquestion_set.count()
+            answered_questions = session.sessionquestion_set.filter(is_answered=True).count()
+            completion_percentage = (answered_questions / total_questions * 100) if total_questions > 0 else 0
+            
+            # Update user history
+            try:
+                history = UserSurveyHistory.objects.get(user=request.user, survey=session.survey)
+                history.current_status = 'completed'
+                
+                # Update best score if current is better
+                if not history.best_score or session.score > history.best_score:
+                    history.best_score = session.score
+                    history.best_percentage = session.percentage
+                
+                # Mark as passed if score meets requirements
+                if session.is_passed:
+                    history.is_passed = True
+                
+                history.save()
+            except UserSurveyHistory.DoesNotExist:
+                pass
+            
+            completion_stats = {
+                'total_questions': total_questions,
+                'answered_questions': answered_questions,
+                'unanswered_questions': unanswered_count,
+                'completion_percentage': round(completion_percentage, 2)
+            }
+            
+            return Response({
+                'message': _('Survey finished successfully'),
+                'session': SurveySessionSerializer(session, context={'request': request}).data,
+                'final_score': final_score,
+                'completion_stats': completion_stats
+            })
+
+
     @extend_schema(
         summary="Прогресс сессии",
         description="""Получить детальный прогресс прохождения сессии.

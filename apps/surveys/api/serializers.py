@@ -303,6 +303,11 @@ class SubmitAnswerSerializer(serializers.Serializer):
         allow_blank=True,
         help_text="Текстовый ответ (для открытых вопросов)"
     )
+    force_finish = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Принудительно завершить опрос после этого ответа"
+    )
     
     def validate(self, attrs):
         """Validate answer submission."""
