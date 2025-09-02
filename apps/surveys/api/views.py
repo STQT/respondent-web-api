@@ -323,10 +323,11 @@ class SurveySessionViewSet(GenericViewSet):
         return Response(serializer.data)
     
     @extend_schema(
-        summary="Отправить ответ",
+        summary="Отправить/обновить ответ",
         description="""Отправить ответ на вопрос в рамках сессии.
         
         Поддерживает различные типы вопросов: один вариант, множественный выбор, открытый ответ.
+        Позволяет обновлять уже данные ответы, если пользователь передумал.
         Автоматически завершает сессию при ответе на последний вопрос.""",
         tags=["Сессии"],
         request={
@@ -382,6 +383,14 @@ class SurveySessionViewSet(GenericViewSet):
                     "question_id": 3,
                     "text_answer": "Мой развернутый ответ на вопрос"
                 }
+            ),
+            OpenApiExample(
+                name="Обновление ответа",
+                request_only=True,
+                value={
+                    "question_id": 1,
+                    "choice_ids": [4]  # Изменен выбор с [3] на [4]
+                }
             )
         ]
     )
@@ -417,8 +426,12 @@ class SurveySessionViewSet(GenericViewSet):
                 )
                 
                 if not created:
+                    # Update existing answer
                     answer.text_answer = validated_data.get('text_answer', '')
                     answer.selected_choices.clear()
+                else:
+                    # New answer
+                    answer.text_answer = validated_data.get('text_answer', '')
                 
                 # Add selected choices
                 if validated_data.get('choice_ids'):
@@ -464,8 +477,9 @@ class SurveySessionViewSet(GenericViewSet):
                         'final_score': final_score
                     })
                 
+                message = _('Answer updated successfully') if not created else _('Answer submitted successfully')
                 return Response({
-                    'message': _('Answer submitted successfully'),
+                    'message': message,
                     'session': SurveySessionSerializer(session, context={'request': request}).data
                 })
         
@@ -676,10 +690,11 @@ class SurveySessionViewSet(GenericViewSet):
         })
     
     @extend_schema(
-        summary="Изменить ответ",
-        description="""Изменить уже данный ответ на вопрос.
+        summary="Обновить ответ",
+        description="""Обновить уже данный ответ на вопрос.
         
-        Доступно только для активных сессий и отвеченных вопросов.""",
+        Доступно только для активных сессий и отвеченных вопросов.
+        Альтернативно можно использовать submit_answer для обновления ответов.""",
         tags=["Сессии"],
         request={
             "type": "object",
@@ -754,7 +769,7 @@ class SurveySessionViewSet(GenericViewSet):
         session_question.save()
         
         return Response({
-            'message': _('Answer modified successfully'),
+            'message': _('Answer updated successfully'),
             'answer': AnswerSerializer(answer).data,
             'session': SurveySessionSerializer(session, context={'request': request}).data
         })

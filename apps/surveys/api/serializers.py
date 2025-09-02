@@ -331,10 +331,13 @@ class SubmitAnswerSerializer(serializers.Serializer):
         except SessionQuestion.DoesNotExist:
             raise serializers.ValidationError(_("Question not found in this session"))
         
-        if session_question.is_answered:
-            raise serializers.ValidationError(_("Question already answered"))
-        
         question = session_question.question
+        
+        # If question is already answered, allow updating the answer
+        if session_question.is_answered:
+            # Check if we can modify the answer
+            if not session.can_modify_answer(attrs['question_id']):
+                raise serializers.ValidationError(_("Cannot modify this answer. Session may be completed or expired."))
         
         # Validate answer based on question type
         if question.question_type in ['single', 'multiple']:
