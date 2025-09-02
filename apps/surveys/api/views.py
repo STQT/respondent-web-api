@@ -28,7 +28,7 @@ from apps.surveys.models import (
 from .serializers import (
     SurveyListSerializer, SurveyDetailSerializer, StartSurveySerializer,
     SurveySessionSerializer, SubmitAnswerSerializer, AnswerSerializer,
-    UserSurveyHistorySerializer
+    UserSurveyHistorySerializer, SessionQuestionSerializer
 )
 
 
@@ -833,6 +833,166 @@ class SurveySessionViewSet(GenericViewSet):
             'questions': questions_data,
             'total_points': total_points,
             'max_total_points': max_total_points
+        })
+    
+    @extend_schema(
+        summary="Следующий вопрос по порядку",
+        description="""Получить следующий вопрос в сессии по порядковому номеру.
+        
+        Возвращает следующий вопрос по порядку, независимо от того, отвечен он или нет.""",
+        tags=["Сессии"],
+        parameters=[
+            OpenApiParameter(
+                name='current_order',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Порядковый номер текущего вопроса',
+                required=True
+            )
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "object", "description": "Информация о следующем вопросе"},
+                    "answer": {
+                        "type": "object", 
+                        "nullable": True,
+                        "description": "Ответ пользователя на этот вопрос (если есть)"
+                    }
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "example": "No next question"}
+                }
+            }
+        }
+    )
+    @action(detail=True, methods=['get'])
+    def next_question_by_order(self, request, pk=None):
+        """Get next question in the session by order."""
+        session = get_object_or_404(self.get_queryset(), pk=pk)
+        current_order = request.query_params.get('current_order')
+        
+        if not current_order:
+            return Response(
+                {'error': _('Current order parameter is required')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            current_order = int(current_order)
+        except ValueError:
+            return Response(
+                {'error': _('Invalid current order parameter')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        next_question = session.get_next_question(current_order)
+        if not next_question:
+            return Response(
+                {'error': _('No next question')},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get answer if exists
+        try:
+            answer = session.answers.get(question=next_question.question)
+            answer_data = AnswerSerializer(answer).data
+        except Answer.DoesNotExist:
+            answer_data = None
+        
+        # Serialize question with language context
+        question_data = SessionQuestionSerializer(
+            next_question, 
+            context={'language': session.language}
+        ).data
+        
+        return Response({
+            'question': question_data,
+            'answer': answer_data
+        })
+    
+    @extend_schema(
+        summary="Предыдущий вопрос",
+        description="""Получить предыдущий вопрос в сессии.
+        
+        Возвращает предыдущий вопрос по порядку, независимо от того, отвечен он или нет.""",
+        tags=["Сессии"],
+        parameters=[
+            OpenApiParameter(
+                name='current_order',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Порядковый номер текущего вопроса',
+                required=True
+            )
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "object", "description": "Информация о предыдущем вопросе"},
+                    "answer": {
+                        "type": "object", 
+                        "nullable": True,
+                        "description": "Ответ пользователя на этот вопрос (если есть)"
+                    }
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "example": "No previous question"}
+                }
+            }
+        }
+    )
+    @action(detail=True, methods=['get'])
+    def previous_question(self, request, pk=None):
+        """Get previous question in the session."""
+        session = get_object_or_404(self.get_queryset(), pk=pk)
+        current_order = request.query_params.get('current_order')
+        
+        if not current_order:
+            return Response(
+                {'error': _('Current order parameter is required')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            current_order = int(current_order)
+        except ValueError:
+            return Response(
+                {'error': _('Invalid current order parameter')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        previous_question = session.get_previous_question(current_order)
+        if not previous_question:
+            return Response(
+                {'error': _('No previous question')},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get answer if exists
+        try:
+            answer = session.answers.get(question=previous_question.question)
+            answer_data = AnswerSerializer(answer).data
+        except Answer.DoesNotExist:
+            answer_data = None
+        
+        # Serialize question with language context
+        question_data = SessionQuestionSerializer(
+            previous_question, 
+            context={'language': session.language}
+        ).data
+        
+        return Response({
+            'question': question_data,
+            'answer': answer_data
         })
 
 
