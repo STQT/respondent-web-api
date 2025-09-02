@@ -248,6 +248,40 @@ class SurveySession(models.Model):
         """Get the next unanswered question in the session."""
         return self.sessionquestion_set.filter(is_answered=False).order_by('order').first()
     
+    def get_question_by_order(self, order):
+        """Get question by specific order number."""
+        try:
+            return self.sessionquestion_set.get(order=order)
+        except SessionQuestion.DoesNotExist:
+            return None
+    
+    def get_previous_question(self, current_order):
+        """Get the previous question in the session."""
+        if current_order <= 1:
+            return None
+        try:
+            return self.sessionquestion_set.get(order=current_order - 1)
+        except SessionQuestion.DoesNotExist:
+            return None
+    
+    def get_next_question(self, current_order):
+        """Get the next question in the session (answered or not)."""
+        try:
+            return self.sessionquestion_set.get(order=current_order + 1)
+        except SessionQuestion.DoesNotExist:
+            return None
+    
+    def can_modify_answer(self, question_id):
+        """Check if user can modify answer for specific question."""
+        try:
+            session_question = self.sessionquestion_set.get(question_id=question_id)
+            # Allow modification if session is still active and question was answered
+            return (self.status in ['started', 'in_progress'] and 
+                   not self.is_expired() and 
+                   session_question.is_answered)
+        except SessionQuestion.DoesNotExist:
+            return False
+    
     def get_current_progress(self):
         """Get current session progress."""
         total_questions = self.sessionquestion_set.count()

@@ -573,6 +573,267 @@ class SurveySessionViewSet(GenericViewSet):
             'questions': questions_data,
             'session': SurveySessionSerializer(session, context={'request': request}).data
         })
+    
+    @extend_schema(
+        summary="Получить вопрос по номеру",
+        description="""Получить конкретный вопрос сессии по его порядковому номеру.
+        
+        Возвращает вопрос с возможностью навигации к предыдущему и следующему вопросу.""",
+        tags=["Сессии"],
+        parameters=[
+            OpenApiParameter(
+                name='order',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Порядковый номер вопроса',
+                required=True
+            )
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "object", "description": "Информация о вопросе"},
+                    "navigation": {
+                        "type": "object",
+                        "properties": {
+                            "has_previous": {"type": "boolean"},
+                            "has_next": {"type": "boolean"},
+                            "previous_order": {"type": "integer", "nullable": True},
+                            "next_order": {"type": "integer", "nullable": True}
+                        }
+                    },
+                    "answer": {
+                        "type": "object", 
+                        "nullable": True,
+                        "description": "Ответ пользователя на этот вопрос (если есть)"
+                    }
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "example": "Question not found"}
+                }
+            }
+        }
+    )
+    @action(detail=True, methods=['get'])
+    def get_question(self, request, pk=None):
+        """Get specific question by order number."""
+        session = get_object_or_404(self.get_queryset(), pk=pk)
+        order = request.query_params.get('order')
+        
+        if not order:
+            return Response(
+                {'error': _('Order parameter is required')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            order = int(order)
+        except ValueError:
+            return Response(
+                {'error': _('Invalid order parameter')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session_question = session.get_question_by_order(order)
+        if not session_question:
+            return Response(
+                {'error': _('Question not found')},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get navigation info
+        previous_question = session.get_previous_question(order)
+        next_question = session.get_next_question(order)
+        
+        # Get answer if exists
+        try:
+            answer = session.answers.get(question=session_question.question)
+            answer_data = AnswerSerializer(answer).data
+        except Answer.DoesNotExist:
+            answer_data = None
+        
+        # Serialize question with language context
+        question_data = SessionQuestionSerializer(
+            session_question, 
+            context={'language': session.language}
+        ).data
+        
+        navigation_data = {
+            'has_previous': previous_question is not None,
+            'has_next': next_question is not None,
+            'previous_order': previous_question.order if previous_question else None,
+            'next_order': next_question.order if next_question else None
+        }
+        
+        return Response({
+            'question': question_data,
+            'navigation': navigation_data,
+            'answer': answer_data
+        })
+    
+    @extend_schema(
+        summary="Изменить ответ",
+        description="""Изменить уже данный ответ на вопрос.
+        
+        Доступно только для активных сессий и отвеченных вопросов.""",
+        tags=["Сессии"],
+        request={
+            "type": "object",
+            "properties": {
+                "question_id": {"type": "integer"},
+                "choice_ids": {"type": "array", "items": {"type": "integer"}},
+                "text_answer": {"type": "string"}
+            },
+            "required": ["question_id"]
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "answer": {"type": "object"},
+                    "session": {"type": "object"}
+                }
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"}
+                }
+            }
+        }
+    )
+    @action(detail=True, methods=['post'])
+    def modify_answer(self, request, pk=None):
+        """Modify existing answer for a question."""
+        session = get_object_or_404(self.get_queryset(), pk=pk)
+        question_id = request.data.get('question_id')
+        
+        if not question_id:
+            return Response(
+                {'error': _('Question ID is required')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if can modify answer
+        if not session.can_modify_answer(question_id):
+            return Response(
+                {'error': _('Cannot modify this answer')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get existing answer
+        try:
+            answer = session.answers.get(question_id=question_id)
+        except Answer.DoesNotExist:
+            return Response(
+                {'error': _('Answer not found')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update answer
+        if 'choice_ids' in request.data:
+            answer.selected_choices.clear()
+            if request.data['choice_ids']:
+                answer.selected_choices.set(request.data['choice_ids'])
+        
+        if 'text_answer' in request.data:
+            answer.text_answer = request.data['text_answer']
+        
+        # Recalculate score
+        points_earned = answer.calculate_score()
+        answer.save()
+        
+        # Update session question
+        session_question = session.sessionquestion_set.get(question_id=question_id)
+        session_question.points_earned = points_earned
+        session_question.save()
+        
+        return Response({
+            'message': _('Answer modified successfully'),
+            'answer': AnswerSerializer(answer).data,
+            'session': SurveySessionSerializer(session, context={'request': request}).data
+        })
+    
+    @extend_schema(
+        summary="Все ответы пользователя",
+        description="""Получить все вопросы сессии с ответами пользователя.
+        
+        Возвращает список всех вопросов с информацией об ответах и заработанных баллах.""",
+        tags=["Сессии"],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "questions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "question": {"type": "object", "description": "Информация о вопросе"},
+                                "answer": {
+                                    "type": "object", 
+                                    "nullable": True,
+                                    "description": "Ответ пользователя"
+                                },
+                                "points_earned": {"type": "number", "description": "Заработанные баллы"},
+                                "max_points": {"type": "number", "description": "Максимальные баллы"}
+                            }
+                        }
+                    },
+                    "total_points": {"type": "number", "description": "Общее количество заработанных баллов"},
+                    "max_total_points": {"type": "number", "description": "Максимально возможные баллы"}
+                }
+            }
+        }
+    )
+    @action(detail=True, methods=['get'])
+    def all_answers(self, request, pk=None):
+        """Get all questions with user answers for the session."""
+        session = get_object_or_404(self.get_queryset(), pk=pk)
+        
+        # Get all session questions with answers
+        session_questions = session.sessionquestion_set.select_related('question').prefetch_related(
+            'question__choices'
+        ).order_by('order')
+        
+        questions_data = []
+        total_points = 0
+        max_total_points = 0
+        
+        for session_question in session_questions:
+            # Get answer if exists
+            try:
+                answer = session.answers.get(question=session_question.question)
+                answer_data = AnswerSerializer(answer).data
+            except Answer.DoesNotExist:
+                answer_data = None
+            
+            # Serialize question with language context
+            question_data = SessionQuestionSerializer(
+                session_question, 
+                context={'language': session.language}
+            ).data
+            
+            questions_data.append({
+                'question': question_data,
+                'answer': answer_data,
+                'points_earned': session_question.points_earned or 0,
+                'max_points': session_question.max_points or 0
+            })
+            
+            total_points += session_question.points_earned or 0
+            max_total_points += session_question.max_points or 0
+        
+        return Response({
+            'questions': questions_data,
+            'total_points': total_points,
+            'max_total_points': max_total_points
+        })
 
 
 @extend_schema(
