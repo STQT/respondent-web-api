@@ -1,3 +1,13 @@
+"""
+ВРЕМЕННО ОТКЛЮЧЕНО: Проверки в методе start отключены для разработки фронтенда
+TODO: Восстановить все проверки после завершения разработки фронтенда
+
+Отключенные проверки:
+- Максимальное количество попыток
+- Активные сессии пользователя
+- Валидация параметров через сериализатор
+"""
+
 from rest_framework import status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -177,65 +187,59 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         """Start a new survey session."""
         survey = self.get_object()
         
-        serializer = StartSurveySerializer(
-            data={
-                'survey_id': survey.id,
-                'questions_count': request.data.get('questions_count'),
-                'language': request.data.get('language', 'uz')
-            },
-            context={'request': request}
-        )
+        # ВРЕМЕННО ОТКЛЮЧЕНО: Все проверки отключены для разработки фронтенда
+        # TODO: Восстановить проверки после завершения разработки фронтенда
         
-        if serializer.is_valid():
-            with transaction.atomic():
-                # Get next attempt number
-                last_attempt = SurveySession.objects.filter(
-                    user=request.user,
-                    survey=survey
-                ).order_by('-attempt_number').first()
-                
-                next_attempt = (last_attempt.attempt_number + 1) if last_attempt else 1
-                
-                # Create new session
-                session = SurveySession.objects.create(
-                    user=request.user,
-                    survey=survey,
-                    attempt_number=next_attempt,
-                    language=serializer.validated_data['language'],
-                    status='started'
-                )
-                
-                # Initialize questions
-                questions_count = serializer.validated_data.get('questions_count')
-                session.initialize_questions(questions_count)
-                
-                # Update session status
-                session.status = 'in_progress'
-                session.save()
-                
-                # Update user survey history
-                history, created = UserSurveyHistory.objects.get_or_create(
-                    user=request.user,
-                    survey=survey,
-                    defaults={
-                        'total_attempts': 1,
-                        'current_status': 'in_progress',
-                        'last_attempt_at': timezone.now()
-                    }
-                )
-                
-                if not created:
-                    history.total_attempts += 1
-                    history.current_status = 'in_progress'
-                    history.last_attempt_at = timezone.now()
-                    history.save()
-                
-                return Response(
-                    SurveySessionSerializer(session, context={'request': request}).data,
-                    status=status.HTTP_201_CREATED
-                )
+        # Получаем параметры из запроса напрямую, пропуская валидацию
+        questions_count = request.data.get('questions_count', survey.questions_count)
+        language = request.data.get('language', 'uz')
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            # Get next attempt number
+            last_attempt = SurveySession.objects.filter(
+                user=request.user,
+                survey=survey
+            ).order_by('-attempt_number').first()
+            
+            next_attempt = (last_attempt.attempt_number + 1) if last_attempt else 1
+            
+            # Create new session
+            session = SurveySession.objects.create(
+                user=request.user,
+                survey=survey,
+                attempt_number=next_attempt,
+                language=language,
+                status='started'
+            )
+            
+            # Initialize questions
+            session.initialize_questions(questions_count)
+            
+            # Update session status
+            session.status = 'in_progress'
+            session.save()
+            
+            # Update user survey history
+            history, created = UserSurveyHistory.objects.get_or_create(
+                user=request.user,
+                survey=survey,
+                defaults={
+                    'total_attempts': 1,
+                    'current_status': 'in_progress',
+                    'last_attempt_at': timezone.now()
+                }
+            )
+            
+            if not created:
+                history.total_attempts += 1
+                history.current_status = 'in_progress'
+                history.last_attempt_at = timezone.now()
+                history.save()
+            
+            return Response(
+                SurveySessionSerializer(session, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
     
     @extend_schema(
         summary="Моя история опросов",

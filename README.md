@@ -2,6 +2,21 @@
 
 UNG | Respondent Web API
 
+## ⚠️ Временные изменения для разработки фронтенда
+
+**ВНИМАНИЕ:** В эндпоинте `/api/surveys/{id}/start/` временно отключены все проверки для упрощения разработки фронтенда.
+
+**Отключенные проверки:**
+- Максимальное количество попыток
+- Активные сессии пользователя  
+- Валидация параметров
+
+**Подробности:** См. файл `FRONTEND_DEVELOPMENT_NOTES.md`
+
+**Восстановление:** После завершения разработки фронтенда необходимо восстановить все проверки в файле `apps/surveys/api/views.py` (метод `start`).
+
+---
+
 [![Built with Cookiecutter Django](https://img.shields.io/badge/built%20with-Cookiecutter%20Django-ff69b4.svg?logo=cookiecutter)](https://github.com/cookiecutter/cookiecutter-django/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
