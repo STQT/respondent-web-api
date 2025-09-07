@@ -9,7 +9,9 @@ from apps.users.api.views import (
     SendOTPView, 
     VerifyOTPView, 
     PhoneLoginView,
-    CustomTokenObtainPairView
+    CustomTokenObtainPairView,
+    BranchListView,
+    PositionListView
 )
 from apps.surveys.api.views import (
     SurveyViewSet,
@@ -46,6 +48,10 @@ urlpatterns = [
     
     # Moderator endpoints
     path("moderator/dashboard/", ModeratorDashboardView.as_view(), name="moderator-dashboard"),
+    
+    # User data endpoints
+    path("branches/", BranchListView.as_view(), name="branches-list"),
+    path("positions/", PositionListView.as_view(), name="positions-list"),
     
     # Include router URLs
     path("", include(router.urls)),

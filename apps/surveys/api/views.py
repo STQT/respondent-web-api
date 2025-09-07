@@ -273,6 +273,35 @@ class SurveyViewSet(ReadOnlyModelViewSet):
 
 
 @extend_schema_view(
+    list=extend_schema(
+        summary="Список сессий",
+        description="Получить список всех сессий прохождения опросов текущим пользователем.",
+        tags=["Сессии"],
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "format": "uuid"},
+                        "survey": {"type": "object"},
+                        "status": {"type": "string"},
+                        "attempt_number": {"type": "integer"},
+                        "started_at": {"type": "string", "format": "date-time"},
+                        "expires_at": {"type": "string", "format": "date-time"},
+                        "language": {"type": "string"},
+                        "progress": {"type": "object"},
+                        "time_remaining": {"type": "integer"},
+                        "current_question": {"type": "object", "nullable": True},
+                        "score": {"type": "integer", "nullable": True},
+                        "total_points": {"type": "integer", "nullable": True},
+                        "percentage": {"type": "number", "nullable": True},
+                        "is_passed": {"type": "boolean", "nullable": True}
+                    }
+                }
+            }
+        }
+    ),
     retrieve=extend_schema(
         summary="Детали сессии",
         description="Получить подробную информацию о сессии прохождения опроса.",
@@ -309,6 +338,12 @@ class SurveySessionViewSet(GenericViewSet):
     def get_queryset(self):
         """Get user's survey sessions."""
         return SurveySession.objects.filter(user=self.request.user).order_by('-started_at')
+    
+    def list(self, request):
+        """Get all user's survey sessions."""
+        sessions = self.get_queryset()
+        serializer = self.get_serializer(sessions, many=True)
+        return Response(serializer.data)
     
     def retrieve(self, request, pk=None):
         """Get session details."""

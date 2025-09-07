@@ -336,3 +336,53 @@ class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericV
         
         serializer = UserSerializer(users, many=True)
         return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Получить все филиалы",
+        description="Возвращает список всех уникальных филиалов (branch) из базы данных пользователей.",
+        responses={
+            200: OpenApiTypes.OBJECT,
+        }
+    )
+)
+class BranchListView(APIView):
+    """Get all unique branches."""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        branches = User.objects.exclude(
+            branch__isnull=True
+        ).exclude(
+            branch__exact=''
+        ).values_list('branch', flat=True).distinct().order_by('branch')
+        
+        return Response({
+            'branches': list(branches)
+        }, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Получить все должности",
+        description="Возвращает список всех уникальных должностей (position) из базы данных пользователей.",
+        responses={
+            200: OpenApiTypes.OBJECT,
+        }
+    )
+)
+class PositionListView(APIView):
+    """Get all unique positions."""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        positions = User.objects.exclude(
+            position__isnull=True
+        ).exclude(
+            position__exact=''
+        ).values_list('position', flat=True).distinct().order_by('position')
+        
+        return Response({
+            'positions': list(positions)
+        }, status=status.HTTP_200_OK)
