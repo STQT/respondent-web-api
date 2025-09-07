@@ -108,9 +108,23 @@ class VerifyOTPSerializer(serializers.Serializer):
         phone_number = attrs.get('phone_number')
         otp_code = attrs.get('otp_code')
         
+        # Логирование для отладки
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Verifying OTP: phone={phone_number}, code={otp_code}")
 
+        # Специальный код для разработки
         if otp_code == "111111":
-            attrs['otp'] = None  # можно None, так как код не из БД
+            # Создаем фиктивный объект OTP для тестирования
+            class MockOTP:
+                def __init__(self, phone_number):
+                    self.phone_number = phone_number
+                    self.is_verified = False
+                
+                def save(self):
+                    pass
+            
+            attrs['otp'] = MockOTP(phone_number)
             return attrs
         try:
             otp = OTPVerification.objects.get(
@@ -179,18 +193,36 @@ class PhoneLoginSerializer(serializers.Serializer):
         phone_number = attrs.get('phone_number')
         otp_code = attrs.get('otp_code')
         
-        # Verify OTP
-        try:
-            otp = OTPVerification.objects.get(
-                phone_number=phone_number,
-                otp_code=otp_code,
-                is_verified=False
-            )
-        except OTPVerification.DoesNotExist:
-            raise serializers.ValidationError(_("Invalid OTP code"))
-        
-        if otp.is_expired():
-            raise serializers.ValidationError(_("OTP code has expired"))
+        # Логирование для отладки
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"PhoneLoginSerializer validating: phone={phone_number}, code={otp_code}")
+
+        # Специальный код для разработки
+        if otp_code == "111111":
+            # Создаем фиктивный объект OTP для тестирования
+            class MockOTP:
+                def __init__(self, phone_number):
+                    self.phone_number = phone_number
+                    self.is_verified = False
+                
+                def save(self):
+                    pass
+            
+            otp = MockOTP(phone_number)
+        else:
+            # Verify OTP
+            try:
+                otp = OTPVerification.objects.get(
+                    phone_number=phone_number,
+                    otp_code=otp_code,
+                    is_verified=False
+                )
+            except OTPVerification.DoesNotExist:
+                raise serializers.ValidationError(_("Invalid OTP code"))
+            
+            if otp.is_expired():
+                raise serializers.ValidationError(_("OTP code has expired"))
         
         # Get or create user
         user, created = User.objects.get_or_create(

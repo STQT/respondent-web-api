@@ -120,16 +120,23 @@ class VerifyOTPView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"VerifyOTPView received data: {request.data}")
+        
         serializer = VerifyOTPSerializer(data=request.data)
         if serializer.is_valid():
             otp = serializer.validated_data['otp']
             otp.is_verified = True
             otp.save()
             
+            logger.info(f"OTP verified successfully for phone: {otp.phone_number}")
             return Response({
                 'message': _('OTP verified successfully'),
                 'phone_number': str(otp.phone_number)
             }, status=status.HTTP_200_OK)
+        
+        logger.warning(f"OTP verification failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

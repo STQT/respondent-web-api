@@ -59,6 +59,19 @@ class UserSignupForm(SignupForm):
     Default fields will be added automatically.
     Check UserSocialSignupForm for accounts created from social.
     """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Remove email field since we use phone_number
+        if 'email' in self.fields:
+            del self.fields['email']
+        if 'username' in self.fields:
+            del self.fields['username']
+    
+    def save(self, request):
+        # Ensure we save with phone_number as the username field
+        user = super().save(request)
+        return user
 
 
 class UserSocialSignupForm(SocialSignupForm):

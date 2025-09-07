@@ -105,7 +105,6 @@ MIGRATION_MODULES = {"sites": "apps.contrib.sites.migrations"}
 # https://docs.djangoproject.com/en/dev/ref/settings/#authentication-backends
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#auth-user-model
 AUTH_USER_MODEL = "users.User"
@@ -311,21 +310,8 @@ CELERY_TASK_SEND_SENT_EVENT = True
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 # django-allauth
 # ------------------------------------------------------------------------------
-ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
-# https://docs.allauth.org/en/latest/account/configuration.html
-ACCOUNT_LOGIN_METHODS = {"username"}
-# https://docs.allauth.org/en/latest/account/configuration.html
-ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
-# https://docs.allauth.org/en/latest/account/configuration.html
-ACCOUNT_EMAIL_VERIFICATION = "mandatory"
-# https://docs.allauth.org/en/latest/account/configuration.html
-ACCOUNT_ADAPTER = "apps.users.adapters.AccountAdapter"
-# https://docs.allauth.org/en/latest/account/forms.html
-ACCOUNT_FORMS = {"signup": "apps.users.forms.UserSignupForm"}
-# https://docs.allauth.org/en/latest/socialaccount/configuration.html
-SOCIALACCOUNT_ADAPTER = "apps.users.adapters.SocialAccountAdapter"
-# https://docs.allauth.org/en/latest/socialaccount/configuration.html
-SOCIALACCOUNT_FORMS = {"signup": "apps.users.forms.UserSocialSignupForm"}
+# Note: Allauth is disabled for this phone-based authentication system
+# We use custom API endpoints for authentication instead
 
 # django-rest-framework
 # -------------------------------------------------------------------------------
