@@ -962,11 +962,11 @@ class SurveySessionViewSet(GenericViewSet):
                 'question': question_data,
                 'answer': answer_data,
                 'points_earned': session_question.points_earned or 0,
-                'max_points': session_question.max_points or 0
+                'max_points': session_question.question.points or 0
             })
             
             total_points += session_question.points_earned or 0
-            max_total_points += session_question.max_points or 0
+            max_total_points += session_question.question.points or 0
         
         return Response({
             'questions': questions_data,
