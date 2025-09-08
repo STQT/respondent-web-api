@@ -1147,10 +1147,10 @@ class SurveySessionViewSet(GenericViewSet):
             "type": "object",
             "properties": {
                 "session": {
-                    "oneOf": [
-                        {"$ref": "#/components/schemas/SurveySession"},
-                        {"type": "null"}
+                    "allOf": [
+                        {"$ref": "#/components/schemas/SurveySession"}
                     ],
+                    "nullable": True,
                     "description": "Информация о сессии или null"
                 }
             }
