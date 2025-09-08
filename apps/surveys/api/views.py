@@ -278,28 +278,7 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         description="Получить список всех сессий прохождения опросов текущим пользователем.",
         tags=["Сессии"],
         responses={
-            200: {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "string", "format": "uuid"},
-                        "survey": {"type": "object"},
-                        "status": {"type": "string"},
-                        "attempt_number": {"type": "integer"},
-                        "started_at": {"type": "string", "format": "date-time"},
-                        "expires_at": {"type": "string", "format": "date-time"},
-                        "language": {"type": "string"},
-                        "progress": {"type": "object"},
-                        "time_remaining": {"type": "integer"},
-                        "current_question": {"type": "object", "nullable": True},
-                        "score": {"type": "integer", "nullable": True},
-                        "total_points": {"type": "integer", "nullable": True},
-                        "percentage": {"type": "number", "nullable": True},
-                        "is_passed": {"type": "boolean", "nullable": True}
-                    }
-                }
-            }
+            200: SurveySessionSerializer(many=True)
         }
     ),
     retrieve=extend_schema(
@@ -307,25 +286,7 @@ class SurveyViewSet(ReadOnlyModelViewSet):
         description="Получить подробную информацию о сессии прохождения опроса.",
         tags=["Сессии"],
         responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "string", "format": "uuid"},
-                    "survey": {"type": "object"},
-                    "status": {"type": "string"},
-                    "attempt_number": {"type": "integer"},
-                    "started_at": {"type": "string", "format": "date-time"},
-                    "expires_at": {"type": "string", "format": "date-time"},
-                    "language": {"type": "string"},
-                    "progress": {"type": "object"},
-                    "time_remaining": {"type": "integer"},
-                    "current_question": {"type": "object", "nullable": True},
-                    "score": {"type": "integer", "nullable": True},
-                    "total_points": {"type": "integer", "nullable": True},
-                    "percentage": {"type": "number", "nullable": True},
-                    "is_passed": {"type": "boolean", "nullable": True}
-                }
-            }
+            200: SurveySessionSerializer
         }
     )
 )
