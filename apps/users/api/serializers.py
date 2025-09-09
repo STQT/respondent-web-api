@@ -317,3 +317,41 @@ class UserSearchResponseSerializer(serializers.Serializer):
     """Сериализатор для ответа поиска пользователей."""
     
     results = UserSerializer(many=True, help_text="Результаты поиска")
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            name="Обновление профиля",
+            value={
+                "name": "Иван Петров",
+                "branch": "Самарканд",
+                "position": "Старший менеджер"
+            }
+        )
+    ]
+)
+class UserProfileUpdateSerializer(serializers.ModelSerializer[User]):
+    """Сериализатор для обновления профиля пользователя."""
+    
+    class Meta:
+        model = User
+        fields = ["name", "branch", "position"]
+    
+    def validate_name(self, value):
+        """Валидация имени."""
+        if not value or not value.strip():
+            raise serializers.ValidationError(_("Name cannot be empty"))
+        return value.strip()
+    
+    def validate_branch(self, value):
+        """Валидация филиала."""
+        if value:
+            return value.strip()
+        return value
+    
+    def validate_position(self, value):
+        """Валидация должности."""
+        if value:
+            return value.strip()
+        return value
