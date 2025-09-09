@@ -279,74 +279,73 @@ class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericV
             # Regular users can only see themselves
             return self.queryset.filter(id=user.id)
 
-    @extend_schema_view(
-        get=extend_schema(
-            summary="Мой профиль",
-            description="Получить информацию о текущем аутентифицированном пользователе.",
-            tags=["Пользователи"],
-            responses={200: UserSerializer}
-        ),
-        post=extend_schema(
-            summary="Обновить мой профиль",
-            description="""Обновить данные профиля текущего пользователя.
-            
-            Позволяет обновить поля: name, branch, position.""",
-            tags=["Пользователи"],
-            request=UserProfileUpdateSerializer,
-            responses={
-                200: UserSerializer,
-                400: {
-                    "type": "object",
-                    "properties": {
-                        "name": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "example": ["Name cannot be empty"]
-                        },
-                        "branch": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
-                        "position": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        }
+    @extend_schema(
+        summary="Мой профиль",
+        description="Получить информацию о текущем аутентифицированном пользователе.",
+        tags=["Пользователи"],
+        responses={200: UserSerializer}
+    )
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """Get current user profile."""
+        serializer = UserSerializer(request.user, context={"request": request})
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
+    
+    @extend_schema(
+        summary="Обновить мой профиль",
+        description="""Обновить данные профиля текущего пользователя.
+        
+        Позволяет обновить поля: name, branch, position.""",
+        tags=["Пользователи"],
+        request=UserProfileUpdateSerializer,
+        responses={
+            200: UserSerializer,
+            400: {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "example": ["Name cannot be empty"]
+                    },
+                    "branch": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "position": {
+                        "type": "array",
+                        "items": {"type": "string"}
                     }
                 }
-            },
-            examples=[
-                OpenApiExample(
-                    name="Обновление профиля",
-                    request_only=True,
-                    value={
-                        "name": "Иван Петров",
-                        "branch": "Самарканд",
-                        "position": "Старший менеджер"
-                    }
-                )
-            ]
-        )
-    )
-    @action(detail=False, methods=['get', 'post'])
-    def me(self, request):
-        """Get or update current user profile."""
-        if request.method == 'GET':
-            serializer = UserSerializer(request.user, context={"request": request})
-            return Response(status=status.HTTP_200_OK, data=serializer.data)
-        
-        elif request.method == 'POST':
-            serializer = UserProfileUpdateSerializer(
-                request.user, 
-                data=request.data, 
-                partial=True,
-                context={"request": request}
+            }
+        },
+        examples=[
+            OpenApiExample(
+                name="Обновление профиля",
+                request_only=True,
+                value={
+                    "name": "Иван Петров",
+                    "branch": "Самарканд",
+                    "position": "Старший менеджер"
+                }
             )
-            if serializer.is_valid():
-                serializer.save()
-                # Return updated user data
-                user_serializer = UserSerializer(request.user, context={"request": request})
-                return Response(status=status.HTTP_200_OK, data=user_serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        ]
+    )
+    @action(detail=False, methods=['post'], url_path='me/update')
+    def me_update(self, request):
+        """Update current user profile."""
+        serializer = UserProfileUpdateSerializer(
+            request.user, 
+            data=request.data, 
+            partial=True,
+            context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            # Return updated user data
+            user_serializer = UserSerializer(request.user, context={"request": request})
+            return Response(status=status.HTTP_200_OK, data=user_serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @extend_schema(
         summary="Поиск пользователей",
