@@ -336,7 +336,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer[User]):
     
     class Meta:
         model = User
-        fields = ["name", "branch", "position"]
+        fields = ["name", "branch", "position", "employee_level", "work_domain"]
     
     def validate_name(self, value):
         """Валидация имени."""
