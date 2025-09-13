@@ -21,6 +21,8 @@ from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
                 "name": "Иван Иванов",
                 "branch": "Ташкент",
                 "position": "Менеджер",
+                "work_domain": "natural_gas",
+                "employee_level": "engineer",
                 "is_moderator": False,
                 "is_phone_verified": True
             }
@@ -32,7 +34,7 @@ class UserSerializer(serializers.ModelSerializer[User]):
     
     class Meta:
         model = User
-        fields = ["id", "phone_number", "name", "branch", "position", "is_moderator", "is_phone_verified"]
+        fields = ["id", "phone_number", "name", "branch", "position", "work_domain", "employee_level", "is_moderator", "is_phone_verified"]
         read_only_fields = ["id", "is_phone_verified"]
 
 
@@ -41,7 +43,7 @@ class UserCreateSerializer(serializers.ModelSerializer[User]):
     
     class Meta:
         model = User
-        fields = ["phone_number", "name", "branch", "position"]
+        fields = ["phone_number", "name", "branch", "position", "work_domain", "employee_level"]
     
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
@@ -159,7 +161,9 @@ class VerifyOTPSerializer(serializers.Serializer):
                 "otp_code": "123456",
                 "name": "Иван Иванов",
                 "branch": "Ташкент",
-                "position": "Менеджер"
+                "position": "Менеджер",
+                "work_domain": "natural_gas",
+                "employee_level": "engineer"
             }
         )
     ]
@@ -187,6 +191,16 @@ class PhoneLoginSerializer(serializers.Serializer):
         max_length=100, 
         required=False, 
         help_text="Должность (для новых пользователей)"
+    )
+    work_domain = serializers.ChoiceField(
+        choices=[('natural_gas', 'Natural Gas'), ('lpg_gas', 'LPG Gas')],
+        required=False,
+        help_text="Домен работы (для новых пользователей)"
+    )
+    employee_level = serializers.ChoiceField(
+        choices=[('junior', 'Junior'), ('engineer', 'Engineer')],
+        required=False,
+        help_text="Уровень сотрудника (для новых пользователей)"
     )
     
     def validate(self, attrs):
@@ -231,6 +245,8 @@ class PhoneLoginSerializer(serializers.Serializer):
                 'name': attrs.get('name', ''),
                 'branch': attrs.get('branch', ''),
                 'position': attrs.get('position', ''),
+                'work_domain': attrs.get('work_domain', ''),
+                'employee_level': attrs.get('employee_level', ''),
                 'is_phone_verified': True
             }
         )
@@ -243,6 +259,10 @@ class PhoneLoginSerializer(serializers.Serializer):
                 user.branch = attrs.get('branch')
             if attrs.get('position'):
                 user.position = attrs.get('position')
+            if attrs.get('work_domain'):
+                user.work_domain = attrs.get('work_domain')
+            if attrs.get('employee_level'):
+                user.employee_level = attrs.get('employee_level')
             user.is_phone_verified = True
             user.save()
         
@@ -326,7 +346,9 @@ class UserSearchResponseSerializer(serializers.Serializer):
             value={
                 "name": "Иван Петров",
                 "branch": "Самарканд",
-                "position": "Старший менеджер"
+                "position": "Старший менеджер",
+                "work_domain": "lpg_gas",
+                "employee_level": "junior"
             }
         )
     ]

@@ -46,6 +46,8 @@ class ChoiceSerializer(serializers.ModelSerializer):
                 "video": None,
                 "points": 5,
                 "order": 1,
+                "category": "safety_logic_psychology",
+                "work_domain": "natural_gas",
                 "choices": [
                     {"id": 1, "text": "Python", "order": 1},
                     {"id": 2, "text": "JavaScript", "order": 2},
@@ -65,7 +67,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         model = Question
         fields = [
             'id', 'question_type', 'text', 'image', 'video', 
-            'points', 'order', 'choices'
+            'points', 'order', 'category', 'work_domain', 'choices'
         ]
     
     def get_text(self, obj):
@@ -86,6 +88,7 @@ class SurveyListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'time_limit_minutes',
             'questions_count', 'passing_score', 'max_attempts',
+            'safety_logic_psychology_percentage', 'other_percentage',
             'total_questions', 'user_attempts', 'can_start'
         ]
     
@@ -135,6 +138,7 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'time_limit_minutes',
             'questions_count', 'passing_score', 'max_attempts',
+            'safety_logic_psychology_percentage', 'other_percentage',
             'total_questions'
         ]
     
