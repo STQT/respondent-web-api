@@ -6,6 +6,7 @@ from django.utils import timezone
 import uuid
 import random
 from datetime import timedelta
+from apps.contrib.constants import UserWorkDomainChoices, EmployeeLevelChoices
 
 
 class Survey(models.Model):
@@ -47,13 +48,28 @@ class Survey(models.Model):
     def __str__(self):
         return self.title
     
-    def get_random_questions(self, count=None, language='uz'):
-        """Get random questions for the survey."""
+    def get_random_questions(self, count=None, language='uz', user_work_domain=None, user_employee_level=None):
+        """Get random questions for the survey, optionally filtered by work domain and employee level."""
         if count is None:
-            count = self.questions_count
+            # Try to get count from employee level config first
+            if user_employee_level:
+                try:
+                    config = self.employee_level_configs.get(employee_level=user_employee_level)
+                    count = config.questions_count
+                except SurveyEmployeeLevelConfig.DoesNotExist:
+                    count = self.questions_count
+            else:
+                count = self.questions_count
         
         # Get all active questions for this survey
         all_questions = self.questions.filter(is_active=True)
+        
+        # Filter by work domain if provided
+        if user_work_domain:
+            # Include questions that are either for this work domain or for all domains (blank)
+            all_questions = all_questions.filter(
+                models.Q(work_domain=user_work_domain) | models.Q(work_domain='')
+            )
         
         # If we have fewer questions than requested, use all available
         total_available = all_questions.count()
@@ -72,6 +88,32 @@ class Survey(models.Model):
     def get_total_available_questions(self):
         """Get total number of available active questions."""
         return self.questions.filter(is_active=True).count()
+
+
+class SurveyEmployeeLevelConfig(models.Model):
+    """Model for configuring question count per employee level for surveys."""
+    
+    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='employee_level_configs')
+    employee_level = models.CharField(
+        _("Employee Level"), 
+        max_length=100, 
+        choices=EmployeeLevelChoices.choices
+    )
+    questions_count = models.PositiveIntegerField(
+        _("Questions Count"), 
+        default=30,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text=_("Number of questions for this employee level")
+    )
+    
+    class Meta:
+        verbose_name = _("Survey Employee Level Config")
+        verbose_name_plural = _("Survey Employee Level Configs")
+        unique_together = ['survey', 'employee_level']
+        ordering = ['survey', 'employee_level']
+    
+    def __str__(self):
+        return f"{self.survey.title} - {self.get_employee_level_display()} ({self.questions_count} questions)"
 
 
 class Question(models.Model):
@@ -98,6 +140,15 @@ class Question(models.Model):
     points = models.PositiveIntegerField(_("Points"), default=1)
     order = models.PositiveIntegerField(_("Order"), default=0)
     is_active = models.BooleanField(_("Is Active"), default=True)
+    
+    # Work domain for filtering questions by user's work domain
+    work_domain = models.CharField(
+        _("Work Domain"), 
+        max_length=100, 
+        blank=True, 
+        choices=UserWorkDomainChoices.choices,
+        help_text=_("Work domain this question is relevant for. Leave blank for all domains.")
+    )
     
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Updated At"), auto_now=True)
@@ -236,7 +287,11 @@ class SurveySession(models.Model):
         if self.sessionquestion_set.exists():
             return  # Questions already initialized
         
-        questions = self.survey.get_random_questions(count=questions_count)
+        questions = self.survey.get_random_questions(
+            count=questions_count, 
+            user_work_domain=self.user.work_domain,
+            user_employee_level=self.user.employee_level
+        )
         for i, question in enumerate(questions, 1):
             SessionQuestion.objects.create(
                 session=self,

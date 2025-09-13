@@ -3,6 +3,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
+from apps.contrib.constants import UserWorkDomainChoices, EmployeeLevelChoices
 import random
 import string
 from datetime import datetime, timedelta
@@ -52,6 +53,9 @@ class User(AbstractUser):
     name = models.CharField(_("Full Name"), max_length=255, blank=True)
     branch = models.CharField(_("Branch"), max_length=100, blank=True)
     position = models.CharField(_("Position"), max_length=100, blank=True)
+    work_domain = models.CharField(
+        _("Work Domain"), max_length=100, blank=True, choices=UserWorkDomainChoices.choices)
+    employee_level = models.CharField(_("Employee Level"), max_length=100, blank=True, choices=EmployeeLevelChoices.choices)
     
     # User type
     is_moderator = models.BooleanField(_("Is Moderator"), default=False)

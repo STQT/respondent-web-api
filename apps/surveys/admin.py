@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .models import (
     Survey, Question, Choice, SurveySession, 
-    SessionQuestion, Answer, UserSurveyHistory
+    SessionQuestion, Answer, UserSurveyHistory, SurveyEmployeeLevelConfig
 )
 
 
@@ -15,8 +15,15 @@ class ChoiceInline(admin.TabularInline):
 class QuestionInline(admin.TabularInline):
     model = Question
     extra = 0
-    fields = ('text_uz', 'question_type', 'points', 'order', 'is_active')
+    fields = ('text_uz', 'question_type', 'work_domain', 'points', 'order', 'is_active')
     readonly_fields = ('created_at', 'updated_at')
+
+
+class SurveyEmployeeLevelConfigInline(admin.TabularInline):
+    model = SurveyEmployeeLevelConfig
+    extra = 0
+    fields = ('employee_level', 'questions_count')
+    min_num = 1  # At least one config required
 
 
 @admin.register(Survey)
@@ -25,7 +32,7 @@ class SurveyAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'created_at')
     search_fields = ('title', 'description')
     ordering = ('-created_at',)
-    inlines = [QuestionInline]
+    inlines = [SurveyEmployeeLevelConfigInline, QuestionInline]
     
     fieldsets = (
         (_('Basic Information'), {
@@ -44,15 +51,15 @@ class SurveyAdmin(admin.ModelAdmin):
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'survey', 'question_type', 'points', 'order', 'is_active')
-    list_filter = ('survey', 'question_type', 'is_active')
+    list_display = ('__str__', 'survey', 'question_type', 'work_domain', 'points', 'order', 'is_active')
+    list_filter = ('survey', 'question_type', 'work_domain', 'is_active')
     search_fields = ('text_uz', 'text_ru')
     ordering = ('survey', 'order')
     inlines = [ChoiceInline]
     
     fieldsets = (
         (_('Basic Information'), {
-            'fields': ('survey', 'question_type', 'order', 'points', 'is_active')
+            'fields': ('survey', 'question_type', 'work_domain', 'order', 'points', 'is_active')
         }),
         (_('Question Text'), {
             'fields': ('text_uz', 'text_uz_cyrl', 'text_ru')
@@ -67,6 +74,20 @@ class QuestionAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(SurveyEmployeeLevelConfig)
+class SurveyEmployeeLevelConfigAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'survey', 'employee_level', 'questions_count')
+    list_filter = ('employee_level', 'survey')
+    search_fields = ('survey__title',)
+    ordering = ('survey', 'employee_level')
+    
+    fieldsets = (
+        (_('Configuration'), {
+            'fields': ('survey', 'employee_level', 'questions_count')
+        }),
+    )
 
 
 @admin.register(Choice)
