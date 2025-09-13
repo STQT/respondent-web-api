@@ -107,14 +107,14 @@ class Survey(models.Model):
         
         selected_questions = []
         
-        # Select questions from Safety, Logic, Psychology category
+        # Select questions from Safety, Logic, Psychology category FIRST
         if safety_logic_psychology_count > 0 and safety_logic_psychology_questions.exists():
             available_safety_count = min(safety_logic_psychology_count, safety_logic_psychology_questions.count())
             safety_question_ids = list(safety_logic_psychology_questions.values_list('id', flat=True))
             selected_safety_ids = random.sample(safety_question_ids, available_safety_count)
             selected_questions.extend(safety_logic_psychology_questions.filter(id__in=selected_safety_ids))
         
-        # Select questions from Other category
+        # Select questions from Other category SECOND
         if other_count > 0 and other_questions.exists():
             available_other_count = min(other_count, other_questions.count())
             other_question_ids = list(other_questions.values_list('id', flat=True))
@@ -130,8 +130,8 @@ class Survey(models.Model):
                 selected_remaining_ids = random.sample(remaining_question_ids, min(remaining_count, len(remaining_question_ids)))
                 selected_questions.extend(remaining_questions.filter(id__in=selected_remaining_ids))
         
-        # Return questions in random order
-        random.shuffle(selected_questions)
+        # Return questions in order: Safety/Logic/Psychology first, then Other
+        # No shuffling to maintain the order
         return selected_questions
     
     def get_total_available_questions(self):
