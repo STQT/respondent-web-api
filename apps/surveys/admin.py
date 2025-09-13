@@ -15,7 +15,7 @@ class ChoiceInline(admin.TabularInline):
 class QuestionInline(admin.TabularInline):
     model = Question
     extra = 0
-    fields = ('text_uz', 'question_type', 'work_domain', 'points', 'order', 'is_active')
+    fields = ('text_uz', 'question_type', 'category', 'work_domain', 'points', 'order', 'is_active')
     readonly_fields = ('created_at', 'updated_at')
 
 
@@ -28,7 +28,7 @@ class SurveyEmployeeLevelConfigInline(admin.TabularInline):
 
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
-    list_display = ('title', 'is_active', 'time_limit_minutes', 'questions_count', 'passing_score', 'created_at')
+    list_display = ('title', 'is_active', 'time_limit_minutes', 'questions_count', 'passing_score', 'safety_logic_psychology_percentage', 'other_percentage', 'created_at')
     list_filter = ('is_active', 'created_at')
     search_fields = ('title', 'description')
     ordering = ('-created_at',)
@@ -41,6 +41,10 @@ class SurveyAdmin(admin.ModelAdmin):
         (_('Settings'), {
             'fields': ('time_limit_minutes', 'questions_count', 'passing_score', 'max_attempts')
         }),
+        (_('Category Distribution'), {
+            'fields': ('safety_logic_psychology_percentage', 'other_percentage'),
+            'description': _('Set the percentage distribution of questions by category. Total should not exceed 100%.')
+        }),
         (_('Timestamps'), {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
@@ -51,15 +55,15 @@ class SurveyAdmin(admin.ModelAdmin):
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'survey', 'question_type', 'work_domain', 'points', 'order', 'is_active')
-    list_filter = ('survey', 'question_type', 'work_domain', 'is_active')
+    list_display = ('__str__', 'survey', 'question_type', 'category', 'work_domain', 'points', 'order', 'is_active')
+    list_filter = ('survey', 'question_type', 'category', 'work_domain', 'is_active')
     search_fields = ('text_uz', 'text_ru')
     ordering = ('survey', 'order')
     inlines = [ChoiceInline]
     
     fieldsets = (
         (_('Basic Information'), {
-            'fields': ('survey', 'question_type', 'work_domain', 'order', 'points', 'is_active')
+            'fields': ('survey', 'question_type', 'category', 'work_domain', 'order', 'points', 'is_active')
         }),
         (_('Question Text'), {
             'fields': ('text_uz', 'text_uz_cyrl', 'text_ru')

@@ -6,7 +6,7 @@ from django.utils import timezone
 import uuid
 import random
 from datetime import timedelta
-from apps.contrib.constants import UserWorkDomainChoices, EmployeeLevelChoices
+from apps.contrib.constants import UserWorkDomainChoices, EmployeeLevelChoices, QuestionCategoryChoices
 
 
 class Survey(models.Model):
@@ -37,6 +37,21 @@ class Survey(models.Model):
         default=3,
         validators=[MinValueValidator(1)]
     )
+    
+    # Category distribution settings
+    safety_logic_psychology_percentage = models.PositiveIntegerField(
+        _("Safety, Logic, Psychology Percentage"), 
+        default=70,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text=_("Percentage of questions from Safety, Logic (IQ), Psychology category")
+    )
+    other_percentage = models.PositiveIntegerField(
+        _("Other Category Percentage"), 
+        default=30,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text=_("Percentage of questions from Other category")
+    )
+    
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Updated At"), auto_now=True)
     
@@ -78,16 +93,65 @@ class Survey(models.Model):
         
         actual_count = min(count, total_available)
         
-        # Get random questions
-        question_ids = list(all_questions.values_list('id', flat=True))
-        selected_ids = random.sample(question_ids, actual_count)
+        # Calculate questions per category based on percentages
+        safety_logic_psychology_count = int(actual_count * self.safety_logic_psychology_percentage / 100)
+        other_count = actual_count - safety_logic_psychology_count
+        
+        # Get questions by category
+        safety_logic_psychology_questions = all_questions.filter(
+            category=QuestionCategoryChoices.SAFETY_LOGIC_PSYCHOLOGY
+        )
+        other_questions = all_questions.filter(
+            category=QuestionCategoryChoices.OTHER
+        )
+        
+        selected_questions = []
+        
+        # Select questions from Safety, Logic, Psychology category
+        if safety_logic_psychology_count > 0 and safety_logic_psychology_questions.exists():
+            available_safety_count = min(safety_logic_psychology_count, safety_logic_psychology_questions.count())
+            safety_question_ids = list(safety_logic_psychology_questions.values_list('id', flat=True))
+            selected_safety_ids = random.sample(safety_question_ids, available_safety_count)
+            selected_questions.extend(safety_logic_psychology_questions.filter(id__in=selected_safety_ids))
+        
+        # Select questions from Other category
+        if other_count > 0 and other_questions.exists():
+            available_other_count = min(other_count, other_questions.count())
+            other_question_ids = list(other_questions.values_list('id', flat=True))
+            selected_other_ids = random.sample(other_question_ids, available_other_count)
+            selected_questions.extend(other_questions.filter(id__in=selected_other_ids))
+        
+        # If we don't have enough questions from categories, fill with remaining questions
+        if len(selected_questions) < actual_count:
+            remaining_count = actual_count - len(selected_questions)
+            remaining_questions = all_questions.exclude(id__in=[q.id for q in selected_questions])
+            if remaining_questions.exists():
+                remaining_question_ids = list(remaining_questions.values_list('id', flat=True))
+                selected_remaining_ids = random.sample(remaining_question_ids, min(remaining_count, len(remaining_question_ids)))
+                selected_questions.extend(remaining_questions.filter(id__in=selected_remaining_ids))
         
         # Return questions in random order
-        return all_questions.filter(id__in=selected_ids).order_by('?')
+        random.shuffle(selected_questions)
+        return selected_questions
     
     def get_total_available_questions(self):
         """Get total number of available active questions."""
         return self.questions.filter(is_active=True).count()
+    
+    def clean(self):
+        """Validate that percentage fields don't exceed 100%."""
+        from django.core.exceptions import ValidationError
+        
+        if self.safety_logic_psychology_percentage + self.other_percentage > 100:
+            raise ValidationError({
+                'safety_logic_psychology_percentage': _('Total percentage cannot exceed 100%.'),
+                'other_percentage': _('Total percentage cannot exceed 100%.')
+            })
+    
+    def save(self, *args, **kwargs):
+        """Override save to run clean validation."""
+        self.clean()
+        super().save(*args, **kwargs)
 
 
 class SurveyEmployeeLevelConfig(models.Model):
@@ -148,6 +212,14 @@ class Question(models.Model):
         blank=True, 
         choices=UserWorkDomainChoices.choices,
         help_text=_("Work domain this question is relevant for. Leave blank for all domains.")
+    )
+    
+    # Question category
+    category = models.CharField(
+        _("Category"), 
+        max_length=50, 
+        choices=QuestionCategoryChoices.choices,
+        help_text=_("Question category for percentage distribution")
     )
     
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
