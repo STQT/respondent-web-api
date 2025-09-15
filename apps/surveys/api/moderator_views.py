@@ -398,6 +398,196 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
             })
         
         return Response(history)
+    
+    @extend_schema(
+        summary="Детали сессии опроса",
+        description="""Получить детальную информацию о конкретной сессии опроса по её ID.
+        
+        Включает все ответы пользователя, баллы и детальную статистику.""",
+        tags=["Модераторы"],
+        responses={
+            200: {
+                "type": "object",
+                "title": "SessionDetail",
+                "properties": {
+                    "session": {
+                        "type": "object",
+                        "title": "SessionInfo",
+                        "properties": {
+                            "id": {"type": "string", "format": "uuid"},
+                            "survey": {"type": "object", "title": "SurveyBasic"},
+                            "user": {"type": "object", "title": "UserBasic"},
+                            "attempt_number": {"type": "integer"},
+                            "status": {"type": "string"},
+                            "score": {"type": "integer"},
+                            "total_points": {"type": "integer"},
+                            "percentage": {"type": "number"},
+                            "is_passed": {"type": "boolean"},
+                            "started_at": {"type": "string", "format": "date-time"},
+                            "completed_at": {"type": "string", "format": "date-time", "nullable": True},
+                            "duration_minutes": {"type": "integer", "nullable": True},
+                            "language": {"type": "string"},
+                            "can_retake": {"type": "boolean"},
+                            "retake_reason": {"type": "string"},
+                            "retake_granted_by": {"type": "string", "nullable": True}
+                        }
+                    },
+                    "questions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "title": "SessionQuestionDetail",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "question": {
+                                    "type": "object",
+                                    "title": "QuestionDetail",
+                                    "properties": {
+                                        "id": {"type": "integer"},
+                                        "text": {"type": "string"},
+                                        "question_type": {"type": "string"},
+                                        "category": {"type": "string"},
+                                        "work_domain": {"type": "string"},
+                                        "points": {"type": "integer"},
+                                        "order": {"type": "integer"}
+                                    }
+                                },
+                                "is_answered": {"type": "boolean"},
+                                "points_earned": {"type": "integer"},
+                                "answer": {
+                                    "type": "object",
+                                    "title": "AnswerDetail",
+                                    "properties": {
+                                        "is_correct": {"type": "boolean"},
+                                        "text_answer": {"type": "string"},
+                                        "selected_choices": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "title": "ChoiceDetail",
+                                                "properties": {
+                                                    "id": {"type": "integer"},
+                                                    "text": {"type": "string"},
+                                                    "is_correct": {"type": "boolean"}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "example": "Session not found"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='session/(?P<session_id>[^/.]+)')
+    def session_detail(self, request, session_id=None):
+        """Get detailed information about specific survey session."""
+        try:
+            session = SurveySession.objects.select_related(
+                'user', 'survey', 'retake_granted_by'
+            ).prefetch_related(
+                'sessionquestion_set__question__choices',
+                'answers__selected_choices'
+            ).get(id=session_id)
+        except SurveySession.DoesNotExist:
+            return Response(
+                {'error': _('Session not found')},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Calculate duration
+        duration = None
+        if session.completed_at and session.started_at:
+            delta = session.completed_at - session.started_at
+            duration = int(delta.total_seconds() / 60)
+        
+        # Get session questions with answers
+        questions_data = []
+        for session_question in session.sessionquestion_set.all().order_by('order'):
+            question = session_question.question
+            
+            # Get answer for this question
+            answer_data = None
+            try:
+                answer = session.answers.get(question=question)
+                answer_data = {
+                    'is_correct': answer.is_correct,
+                    'text_answer': answer.text_answer,
+                    'selected_choices': [
+                        {
+                            'id': choice.id,
+                            'text': choice.get_text('ru'),
+                            'is_correct': choice.is_correct
+                        }
+                        for choice in answer.selected_choices.all()
+                    ]
+                }
+            except:
+                answer_data = {
+                    'is_correct': None,
+                    'text_answer': '',
+                    'selected_choices': []
+                }
+            
+            questions_data.append({
+                'id': session_question.id,
+                'question': {
+                    'id': question.id,
+                    'text': question.get_text('ru'),
+                    'question_type': question.question_type,
+                    'category': question.category,
+                    'work_domain': question.work_domain,
+                    'points': question.points,
+                    'order': session_question.order
+                },
+                'is_answered': session_question.is_answered,
+                'points_earned': session_question.points_earned,
+                'answer': answer_data
+            })
+        
+        session_data = {
+            'session': {
+                'id': session.id,
+                'survey': {
+                    'id': session.survey.id,
+                    'title': session.survey.title,
+                    'description': session.survey.description
+                },
+                'user': {
+                    'id': session.user.id,
+                    'name': session.user.name,
+                    'phone_number': str(session.user.phone_number),
+                    'branch': session.user.branch,
+                    'position': session.user.position,
+                    'work_domain': session.user.work_domain,
+                    'employee_level': session.user.employee_level
+                },
+                'attempt_number': session.attempt_number,
+                'status': session.status,
+                'score': session.score,
+                'total_points': session.total_points,
+                'percentage': float(session.percentage) if session.percentage else None,
+                'is_passed': session.is_passed,
+                'started_at': session.started_at,
+                'completed_at': session.completed_at,
+                'duration_minutes': duration,
+                'language': session.language,
+                'can_retake': session.can_retake,
+                'retake_reason': session.retake_reason,
+                'retake_granted_by': session.retake_granted_by.name if session.retake_granted_by else None
+            },
+            'questions': questions_data
+        }
+        
+        return Response(session_data)
 
 
 @extend_schema_view(
