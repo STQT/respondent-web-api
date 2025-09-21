@@ -294,6 +294,12 @@ class SurveySession(models.Model):
     # Session tracking
     status = models.CharField(_("Status"), max_length=15, choices=STATUS_CHOICES, default='started')
     attempt_number = models.PositiveIntegerField(_("Attempt Number"), default=1)
+    certificate_order = models.PositiveIntegerField(
+        _("Certificate Order Number"), 
+        null=True, 
+        blank=True,
+        help_text=_("Auto-incrementing order number for certificate identification")
+    )
     
     # Time tracking
     started_at = models.DateTimeField(_("Started At"), auto_now_add=True)
@@ -341,6 +347,20 @@ class SurveySession(models.Model):
     def save(self, *args, **kwargs):
         if not self.expires_at:
             self.expires_at = timezone.now() + timedelta(minutes=self.survey.time_limit_minutes)
+        
+        # Auto-assign certificate order number when session is completed
+        if self.status == 'completed' and not self.certificate_order:
+            # Get the next certificate order number
+            last_certificate = SurveySession.objects.filter(
+                status='completed',
+                certificate_order__isnull=False
+            ).order_by('-certificate_order').first()
+            
+            if last_certificate:
+                self.certificate_order = last_certificate.certificate_order + 1
+            else:
+                self.certificate_order = 1
+        
         super().save(*args, **kwargs)
     
     def is_expired(self):

@@ -17,6 +17,10 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import transaction
+from django.views import View
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+import requests
 from drf_spectacular.utils import (
     extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
 )
@@ -28,7 +32,7 @@ from apps.surveys.models import (
 from .serializers import (
     SurveyListSerializer, SurveyDetailSerializer, StartSurveySerializer,
     SurveySessionSerializer, SubmitAnswerSerializer, AnswerSerializer,
-    UserSurveyHistorySerializer, SessionQuestionSerializer
+    UserSurveyHistorySerializer, SessionQuestionSerializer, CertificateDataSerializer
 )
 
 
@@ -1180,3 +1184,242 @@ class CurrentSessionView(APIView):
             return Response({'session': serializer.data})
         
         return Response({'session': None})
+
+
+from django.views import View
+from django.http import HttpResponse
+import requests
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class DownloadCertificatePDFView(View):
+    """Download PDF certificate from HTML page using Gotenberg."""
+    
+    def get(self, request, session_id, *args, **kwargs):
+        """Generate and download PDF certificate for survey session."""
+        from apps.surveys.models import SurveySession
+        
+        try:
+            # Get session with related data
+            session = SurveySession.objects.select_related(
+                'user', 'survey'
+            ).get(id=session_id)
+        except SurveySession.DoesNotExist:
+            return HttpResponse(
+                '{"error": "Session not found"}', 
+                content_type="application/json", 
+                status=404
+            )
+        
+        # Check permissions - user can only access their own certificates
+        # or moderators can access any certificate
+        if not request.user.is_authenticated:
+            return HttpResponse(
+                '{"error": "Authentication required"}', 
+                content_type="application/json", 
+                status=401
+            )
+        
+        if not (request.user == session.user or request.user.is_moderator):
+            return HttpResponse(
+                '{"error": "Access denied"}', 
+                content_type="application/json", 
+                status=403
+            )
+        
+        # Check if session is completed
+        if session.status != 'completed':
+            return HttpResponse(
+                '{"error": "Certificate can only be generated for completed sessions"}', 
+                content_type="application/json", 
+                status=400
+            )
+        
+        # Construct certificate URL - используем базовый URL из настроек или дефолтный
+        from django.conf import settings
+        base_url = getattr(settings, 'CERTIFICATE_BASE_URL', 'https://savollar.leetcode.uz')
+        if not base_url.endswith('/'):
+            base_url += '/'
+        
+        certificate_url = f"{base_url}certificate/{session_id}"
+        
+        # Prepare data for Gotenberg
+        gotenberg_url = "http://gotenberg:3000/forms/chromium/convert/url"
+        
+        # Options for PDF generation - using multipart/form-data
+        # Need at least one file to trigger multipart/form-data content type
+        files = {"dummy": ("", "", "text/plain")}
+        data = {
+            "url": certificate_url,
+            "marginTop": "0",
+            "marginBottom": "0", 
+            "marginLeft": "0",
+            "marginRight": "0",
+            "format": "A4",
+            "landscape": "true",
+            "waitTimeout": "10s",
+            "waitForSelector": "body",
+        }
+        
+        try:
+            logger.info(f"Converting certificate to PDF: {certificate_url}")
+            
+            # Send request to Gotenberg with multipart/form-data
+            response = requests.post(
+                gotenberg_url, 
+                data=data,
+                files=files,
+                timeout=60
+            )
+            response.raise_for_status()
+            
+            # Get PDF content from Gotenberg response
+            pdf_content = response.content
+            
+            # Return PDF file for download
+            http_response = HttpResponse(pdf_content, content_type="application/pdf")
+            http_response["Content-Disposition"] = f'attachment; filename="certificate_{session.user.name}_{session.survey.title}.pdf"'
+            return http_response
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout when converting certificate to PDF: {certificate_url}")
+            return HttpResponse(
+                '{"error": "Timeout: Certificate page took too long to load"}', 
+                content_type="application/json", 
+                status=500
+            )
+        except requests.exceptions.ConnectionError:
+            logger.error("Connection error when connecting to Gotenberg")
+            return HttpResponse(
+                '{"error": "Error generating PDF: Cannot connect to PDF service"}', 
+                content_type="application/json", 
+                status=500
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error when converting certificate to PDF: {str(e)}")
+            return HttpResponse(
+                f'{{"error": "Error generating PDF: {str(e)}"}}', 
+                content_type="application/json", 
+                status=500
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error when converting certificate to PDF: {str(e)}")
+            return HttpResponse(
+                f'{{"error": "Unexpected error: {str(e)}"}}', 
+                content_type="application/json", 
+                status=500
+            )
+
+
+@extend_schema(
+    summary="Получить данные сертификата",
+    description="""Получить данные сертификата для завершенной сессии опроса.
+    
+    Возвращает информацию о пользователе, опросе и результатах для отображения на фронтенде.""",
+    tags=["Сертификаты"],
+    parameters=[
+        OpenApiParameter(
+            name='session_id',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            description='UUID сессии опроса',
+            required=True
+        )
+    ],
+    responses={
+        200: {
+            "description": "Данные сертификата",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "format": "uuid"},
+                            "certificate_order": {"type": "integer", "description": "Порядковый номер сертификата"},
+                            "attempt_number": {"type": "integer"},
+                            "user_name": {"type": "string", "description": "ФИО пользователя"},
+                            "user_branch": {"type": "string", "description": "Филиал пользователя"},
+                            "user_position": {"type": "string", "description": "Должность пользователя"},
+                            "user_work_domain": {"type": "string", "description": "Домен работы пользователя"},
+                            "user_employee_level": {"type": "string", "description": "Уровень сотрудника"},
+                            "survey_title": {"type": "string", "description": "Название опроса"},
+                            "survey_description": {"type": "string", "description": "Описание опроса"},
+                            "score": {"type": "integer", "description": "Получено баллов"},
+                            "total_points": {"type": "integer", "description": "Максимум баллов"},
+                            "percentage": {"type": "number", "description": "Процент выполнения"},
+                            "is_passed": {"type": "boolean", "description": "Пройден ли опрос"},
+                            "started_at": {"type": "string", "format": "date-time"},
+                            "completed_at": {"type": "string", "format": "date-time"},
+                            "duration_minutes": {"type": "integer", "description": "Время выполнения в минутах"},
+                            "language": {"type": "string", "description": "Язык опроса"}
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Сессия не найдена",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "error": {"type": "string", "example": "Session not found"}
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Нет доступа к данным сертификата",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "error": {"type": "string", "example": "Access denied"}
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+class GetCertificateDataView(APIView):
+    """Get certificate data for completed survey session."""
+    
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, session_id, *args, **kwargs):
+        """Get certificate data for survey session."""
+        try:
+            # Get session with related data
+            session = SurveySession.objects.select_related(
+                'user', 'survey'
+            ).get(id=session_id)
+        except SurveySession.DoesNotExist:
+            return Response(
+                {'error': _('Session not found')}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permissions - user can only access their own certificates
+        # or moderators can access any certificate
+        if not (request.user == session.user or request.user.is_moderator):
+            return Response(
+                {'error': _('Access denied')}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if session is completed
+        if session.status != 'completed':
+            return Response(
+                {'error': _('Certificate data is only available for completed sessions')}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Serialize certificate data
+        serializer = CertificateDataSerializer(session)
+        return Response(serializer.data)

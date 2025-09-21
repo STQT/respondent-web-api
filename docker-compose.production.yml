@@ -119,3 +119,11 @@ services:
       - '8021:80'
       - '8443:443'
     restart: unless-stopped
+  
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: savollar_local_gotenberg
+    ports:
+      - '3000:3000'
+    volumes: []
+    restart: unless-stopped

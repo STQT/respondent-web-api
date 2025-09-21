@@ -67,3 +67,11 @@ services:
     ports:
       - '5555:5555'
     command: /start-flower
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: savollar_local_gotenberg
+    ports:
+      - '3000:3000'
+    volumes: []
+    restart: unless-stopped

@@ -397,3 +397,32 @@ class UserSurveyHistorySerializer(serializers.ModelSerializer):
             'survey', 'total_attempts', 'best_score', 'best_percentage',
             'last_attempt_at', 'is_passed', 'current_status', 'can_continue'
         ]
+
+
+class CertificateDataSerializer(serializers.ModelSerializer):
+    """Serializer for certificate data."""
+    
+    user_name = serializers.CharField(source='user.name', read_only=True)
+    user_branch = serializers.CharField(source='user.branch', read_only=True)
+    user_position = serializers.CharField(source='user.position', read_only=True)
+    user_work_domain = serializers.CharField(source='user.get_work_domain_display', read_only=True)
+    user_employee_level = serializers.CharField(source='user.get_employee_level_display', read_only=True)
+    survey_title = serializers.CharField(source='survey.title', read_only=True)
+    survey_description = serializers.CharField(source='survey.description', read_only=True)
+    duration_minutes = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SurveySession
+        fields = [
+            'id', 'certificate_order', 'attempt_number',
+            'user_name', 'user_branch', 'user_position', 
+            'user_work_domain', 'user_employee_level',
+            'survey_title', 'survey_description',
+            'score', 'total_points', 'percentage', 'is_passed',
+            'started_at', 'completed_at', 'duration_minutes',
+            'language'
+        ]
+    
+    def get_duration_minutes(self, obj):
+        """Calculate duration in minutes."""
+        return obj.duration_minutes()
