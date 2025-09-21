@@ -1,13 +1,3 @@
-"""
-ВРЕМЕННО ОТКЛЮЧЕНО: Проверки в методе start отключены для разработки фронтенда
-TODO: Восстановить все проверки после завершения разработки фронтенда
-
-Отключенные проверки:
-- Максимальное количество попыток
-- Активные сессии пользователя
-- Валидация параметров через сериализатор
-"""
-
 from rest_framework import status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -1423,3 +1413,245 @@ class GetCertificateDataView(APIView):
         # Serialize certificate data
         serializer = CertificateDataSerializer(session)
         return Response(serializer.data)
+
+
+@extend_schema(
+    summary="Получить данные сертификата по UUID пользователя",
+    description="""Получить данные сертификата для пользователя по его UUID.
+    
+    Возвращает информацию о сессии с наивысшим баллом у пользователя.""",
+    tags=["Сертификаты"],
+    parameters=[
+        OpenApiParameter(
+            name='user_uuid',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            description='UUID пользователя',
+            required=True
+        )
+    ],
+    responses={
+        200: {
+            "description": "Данные сертификата",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "format": "uuid"},
+                            "certificate_order": {"type": "integer", "description": "Порядковый номер сертификата"},
+                            "attempt_number": {"type": "integer"},
+                            "user_name": {"type": "string", "description": "ФИО пользователя"},
+                            "user_branch": {"type": "string", "description": "Филиал пользователя"},
+                            "user_position": {"type": "string", "description": "Должность пользователя"},
+                            "user_work_domain": {"type": "string", "description": "Домен работы пользователя"},
+                            "user_employee_level": {"type": "string", "description": "Уровень сотрудника"},
+                            "survey_title": {"type": "string", "description": "Название опроса"},
+                            "survey_description": {"type": "string", "description": "Описание опроса"},
+                            "score": {"type": "integer", "description": "Получено баллов"},
+                            "total_points": {"type": "integer", "description": "Максимум баллов"},
+                            "percentage": {"type": "number", "description": "Процент выполнения"},
+                            "is_passed": {"type": "boolean", "description": "Пройден ли опрос"},
+                            "started_at": {"type": "string", "format": "date-time"},
+                            "completed_at": {"type": "string", "format": "date-time"},
+                            "duration_minutes": {"type": "integer", "description": "Время выполнения в минутах"},
+                            "language": {"type": "string", "description": "Язык опроса"}
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Пользователь не найден или нет сессий",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "error": {"type": "string", "example": "User not found or no sessions available"}
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+class GetUserCertificateDataView(APIView):
+    """Get certificate data for user by UUID - returns session with highest score."""
+    
+    def get(self, request, user_uuid, *args, **kwargs):
+        """Get certificate data for user's best session."""
+        from apps.users.models import User
+        
+        try:
+            # Get user by UUID
+            user = User.objects.get(id=user_uuid)
+        except User.DoesNotExist:
+            return Response(
+                {'error': _('User not found')}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get session with highest score for this user
+        session = SurveySession.objects.filter(
+            user=user,
+            score__isnull=False  # Only sessions with scores
+        ).order_by('-score', '-completed_at').first()
+        
+        if not session:
+            return Response(
+                {'error': _('No completed sessions found for this user')}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Serialize certificate data
+        serializer = CertificateDataSerializer(session)
+        return Response(serializer.data)
+
+
+@extend_schema(
+    summary="Скачать PDF сертификат по UUID пользователя",
+    description="""Скачать PDF сертификат для пользователя по его UUID.
+    
+    Генерирует сертификат для сессии с наивысшим баллом у пользователя.""",
+    tags=["Сертификаты"],
+    parameters=[
+        OpenApiParameter(
+            name='user_uuid',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            description='UUID пользователя',
+            required=True
+        )
+    ],
+    responses={
+        200: {
+            "description": "PDF сертификат",
+            "content": {
+                "application/pdf": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Пользователь не найден или нет сессий",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "error": {"type": "string", "example": "User not found or no sessions available"}
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+class DownloadUserCertificatePDFView(View):
+    """Download PDF certificate for user by UUID - generates certificate for session with highest score."""
+    
+    def get(self, request, user_uuid, *args, **kwargs):
+        """Generate and download PDF certificate for user's best session."""
+        from apps.users.models import User
+        
+        try:
+            # Get user by UUID
+            user = User.objects.get(id=user_uuid)
+        except User.DoesNotExist:
+            return HttpResponse(
+                '{"error": "User not found"}', 
+                content_type="application/json", 
+                status=404
+            )
+        
+        # Get session with highest score for this user
+        session = SurveySession.objects.filter(
+            user=user,
+            score__isnull=False  # Only sessions with scores
+        ).order_by('-score', '-completed_at').first()
+        
+        if not session:
+            return HttpResponse(
+                '{"error": "No completed sessions found for this user"}', 
+                content_type="application/json", 
+                status=404
+            )
+        
+        # Construct certificate URL
+        from django.conf import settings
+        base_url = getattr(settings, 'CERTIFICATE_BASE_URL', 'https://savollar.leetcode.uz')
+        if not base_url.endswith('/'):
+            base_url += '/'
+        
+        certificate_url = f"{base_url}certificate/{session.id}"
+        
+        # Prepare data for Gotenberg
+        gotenberg_url = "http://gotenberg:3000/forms/chromium/convert/url"
+        
+        # Options for PDF generation - using multipart/form-data
+        # Need at least one file to trigger multipart/form-data content type
+        files = {"dummy": ("", "", "text/plain")}
+        data = {
+            "url": certificate_url,
+            "marginTop": "0",
+            "marginBottom": "0", 
+            "marginLeft": "0",
+            "marginRight": "0",
+            "format": "A4",
+            "landscape": "true",
+            "waitTimeout": "10s",
+            "waitForSelector": "body",
+        }
+        
+        try:
+            logger.info(f"Converting user certificate to PDF: {certificate_url}")
+            
+            # Send request to Gotenberg with multipart/form-data
+            response = requests.post(
+                gotenberg_url, 
+                data=data,
+                files=files,
+                timeout=60
+            )
+            response.raise_for_status()
+            
+            # Get PDF content from Gotenberg response
+            pdf_content = response.content
+            
+            # Return PDF file for download
+            http_response = HttpResponse(pdf_content, content_type="application/pdf")
+            http_response["Content-Disposition"] = f'attachment; filename="certificate_{user.name}_{session.survey.title}.pdf"'
+            return http_response
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout when converting user certificate to PDF: {certificate_url}")
+            return HttpResponse(
+                '{"error": "Timeout: Certificate page took too long to load"}', 
+                content_type="application/json", 
+                status=500
+            )
+        except requests.exceptions.ConnectionError:
+            logger.error("Connection error when connecting to Gotenberg")
+            return HttpResponse(
+                '{"error": "Error generating PDF: Cannot connect to PDF service"}', 
+                content_type="application/json", 
+                status=500
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error when converting user certificate to PDF: {str(e)}")
+            return HttpResponse(
+                f'{{"error": "Error generating PDF: {str(e)}"}}', 
+                content_type="application/json", 
+                status=500
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error when converting user certificate to PDF: {str(e)}")
+            return HttpResponse(
+                f'{{"error": "Unexpected error: {str(e)}"}}', 
+                content_type="application/json", 
+                status=500
+            )

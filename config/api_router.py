@@ -16,7 +16,9 @@ from apps.users.api.views import (
 from apps.surveys.api.views import (
     SurveyViewSet,
     SurveySessionViewSet,
-    CurrentSessionView
+    CurrentSessionView,
+    DownloadUserCertificatePDFView,
+    GetUserCertificateDataView
 )
 from apps.surveys.api.moderator_views import (
     ModeratorUserViewSet,
