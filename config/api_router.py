@@ -52,6 +52,7 @@ urlpatterns = [
     # User data endpoints
     path("branches/", BranchListView.as_view(), name="branches-list"),
     path("positions/", PositionListView.as_view(), name="positions-list"),
+    path("certificate/", include("apps.surveys.urls", namespace="surveys")),
     
     # Include router URLs
     path("", include(router.urls)),
