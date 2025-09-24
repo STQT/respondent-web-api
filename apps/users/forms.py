@@ -33,7 +33,7 @@ class UserAdminCreationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ("phone_number", "name", "branch", "position", "is_moderator")
+        fields = ("phone_number", "name", "position", "is_moderator")
         error_messages = {
             "phone_number": {"unique": _("This phone number has already been taken.")},
         }

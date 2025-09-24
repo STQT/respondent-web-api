@@ -483,7 +483,7 @@ class GTFStaffListView(APIView):
 
 @extend_schema(
     summary="Регистрация пользователя (телефон + пароль)",
-    description="Создает пользователя по phone_number и password. Опционально: name, branch_id, position_id, gtf_id.",
+    description="Создает пользователя по phone_number и password. Опционально: name, position_id, gtf_id.",
     tags=["Аутентификация"],
     request={
         'application/json': {
@@ -492,7 +492,6 @@ class GTFStaffListView(APIView):
                 'phone_number': {'type': 'string', 'example': '+998901234567'},
                 'password': {'type': 'string', 'example': 'secret123'},
                 'name': {'type': 'string', 'example': 'Иван Иванов'},
-                'branch_id': {'type': 'integer'},
                 'position_id': {'type': 'integer'},
                 'gtf_id': {'type': 'integer'},
             },
@@ -508,7 +507,6 @@ class RegisterView(APIView):
         phone_number = request.data.get('phone_number')
         password = request.data.get('password')
         name = request.data.get('name', '')
-        branch_id = request.data.get('branch_id')
         position_id = request.data.get('position_id')
         gtf_id = request.data.get('gtf_id')
 
@@ -519,8 +517,6 @@ class RegisterView(APIView):
             return Response({'error': _('User with this phone already exists')}, status=status.HTTP_400_BAD_REQUEST)
 
         extra = {'name': name}
-        if branch_id:
-            extra['branch_id'] = branch_id
         if position_id:
             extra['position_id'] = position_id
         if gtf_id:

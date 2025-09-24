@@ -57,9 +57,12 @@ class BranchStaff(models.Model):
 
 class PositionStaff(models.Model):
     """Model for storing Position staff."""
+    branch = models.ForeignKey(BranchStaff, on_delete=models.SET_NULL, verbose_name=_("Branch"), blank=True, null=True)
     name_uz = models.CharField(_("Choice Name (Uzbek Latin)"), max_length=500)
     name_uz_cyrl = models.CharField(_("Choice Name (Uzbek Cyrillic)"), max_length=500, blank=True)
     name_ru = models.CharField(_("Choice Name (Russian)"), max_length=500, blank=True)
+    work_domain = models.CharField(
+        _("Work Domain"), max_length=100, blank=True, choices=UserWorkDomainChoices.choices)
     
     def __str__(self):
         return self.name_uz
@@ -78,8 +81,7 @@ class User(AbstractUser):
     
     # User profile fields
     name = models.CharField(_("Full Name"), max_length=255, blank=True)
-    branch = models.ForeignKey(BranchStaff, on_delete=models.SET_NULL, verbose_name=_("Branch"), max_length=100, blank=True, null=True)
-    position = models.ForeignKey(PositionStaff, on_delete=models.SET_NULL, verbose_name=_("Position"), max_length=100, blank=True, null=True)
+    position = models.ForeignKey(PositionStaff, on_delete=models.SET_NULL, verbose_name=_("Position"), blank=True, null=True)
     gtf = models.ForeignKey(GTFStaff, on_delete=models.SET_NULL, verbose_name=_("GTF"), blank=True, null=True)
     work_domain = models.CharField(
         _("Work Domain"), max_length=100, blank=True, choices=UserWorkDomainChoices.choices)

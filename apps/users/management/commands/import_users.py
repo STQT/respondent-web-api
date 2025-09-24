@@ -72,8 +72,7 @@ class Command(BaseCommand):
                                 name_uz_cyrl=branch_name_uz_cyrl or '',
                                 name_ru=branch_name_ru or ''
                             )
-                        if branch:
-                            user.branch = branch
+                        # Branch is now linked to position, not directly to user
 
                     # Resolve PositionStaff similarly
                     if position_name_uz or position_name_uz_cyrl or position_name_ru:
@@ -83,10 +82,12 @@ class Command(BaseCommand):
                         if not position and position_name_ru:
                             position = PositionStaff.objects.filter(name_ru=position_name_ru).first()
                         if not position and (position_name_uz or position_name_uz_cyrl or position_name_ru):
+                            # Create position with branch reference
                             position = PositionStaff.objects.create(
                                 name_uz=position_name_uz or '',
                                 name_uz_cyrl=position_name_uz_cyrl or '',
-                                name_ru=position_name_ru or ''
+                                name_ru=position_name_ru or '',
+                                branch=branch  # Link to the branch we found/created above
                             )
                         if position:
                             user.position = position

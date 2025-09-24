@@ -21,7 +21,7 @@ class UserAdmin(admin.ModelAdmin):
     add_form = UserAdminCreationForm
     fieldsets = (
         (None, {"fields": ("phone_number", "password")}),
-        (_("Personal info"), {"fields": ("name", "branch", "position")}),
+        (_("Personal info"), {"fields": ("name", "position", "gtf", "work_domain", "employee_level")}),
         (_("Phone Verification"), {"fields": ("is_phone_verified",)}),
         (
             _("Permissions"),
@@ -43,13 +43,13 @@ class UserAdmin(admin.ModelAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("phone_number", "name", "branch", "position", "is_moderator", "password1", "password2"),
+                "fields": ("phone_number", "name", "position", "gtf", "work_domain", "employee_level", "is_moderator", "password1", "password2"),
             },
         ),
     )
-    list_display = ["phone_number", "name", "branch", "position", "is_moderator", "is_phone_verified", "is_superuser"]
-    list_filter = ["is_staff", "is_superuser", "is_active", "is_moderator", "is_phone_verified", "branch"]
-    search_fields = ["name", "phone_number", "branch", "position"]
+    list_display = ["phone_number", "name", "position", "gtf", "work_domain", "employee_level", "is_moderator", "is_phone_verified", "is_superuser"]
+    list_filter = ["is_staff", "is_superuser", "is_active", "is_moderator", "is_phone_verified", "position", "gtf", "work_domain", "employee_level"]
+    search_fields = ["name", "phone_number", "position__name_uz", "gtf__name_uz"]
     ordering = ["phone_number"]
 
 
@@ -71,8 +71,9 @@ class BranchStaffAdmin(admin.ModelAdmin):
 
 @admin.register(PositionStaff)
 class PositionStaffAdmin(admin.ModelAdmin):
-    list_display = ["id", "name_uz", "name_uz_cyrl", "name_ru"]
-    search_fields = ["name_uz", "name_uz_cyrl", "name_ru"]
+    list_display = ["id", "name_uz", "name_uz_cyrl", "name_ru", "branch"]
+    list_filter = ["branch"]
+    search_fields = ["name_uz", "name_uz_cyrl", "name_ru", "branch__name_uz"]
     ordering = ["name_uz"]
 
 

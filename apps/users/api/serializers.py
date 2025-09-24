@@ -19,8 +19,11 @@ from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
                 "id": 1,
                 "phone_number": "+998901234567",
                 "name": "Иван Иванов",
-                "branch": "Ташкент",
-                "position": "Менеджер",
+                "position": 1,
+                "branch_name": "Ташкент",
+                "position_name": "Менеджер",
+                "gtf": 1,
+                "gtf_name": "GTF-1",
                 "work_domain": "natural_gas",
                 "employee_level": "engineer",
                 "is_moderator": False,
@@ -32,10 +35,14 @@ from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 class UserSerializer(serializers.ModelSerializer[User]):
     """Сериализатор для модели пользователя."""
     
+    branch_name = serializers.CharField(source='position.branch.name_uz', read_only=True)
+    position_name = serializers.CharField(source='position.name_uz', read_only=True)
+    gtf_name = serializers.CharField(source='gtf.name_uz', read_only=True)
+    
     class Meta:
         model = User
-        fields = ["id", "phone_number", "name", "branch", "position", "work_domain", "employee_level", "is_moderator", "is_phone_verified"]
-        read_only_fields = ["id", "is_phone_verified"]
+        fields = ["id", "phone_number", "name", "position", "branch_name", "position_name", "gtf", "gtf_name", "work_domain", "employee_level", "is_moderator", "is_phone_verified"]
+        read_only_fields = ["id", "is_phone_verified", "branch_name", "position_name", "gtf_name"]
 
 
 class UserCreateSerializer(serializers.ModelSerializer[User]):
@@ -43,7 +50,7 @@ class UserCreateSerializer(serializers.ModelSerializer[User]):
     
     class Meta:
         model = User
-        fields = ["phone_number", "name", "branch", "position", "work_domain", "employee_level"]
+        fields = ["phone_number", "name", "position", "gtf", "work_domain", "employee_level"]
     
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
@@ -160,8 +167,8 @@ class VerifyOTPSerializer(serializers.Serializer):
                 "phone_number": "+998901234567",
                 "otp_code": "123456",
                 "name": "Иван Иванов",
-                "branch": "Ташкент",
-                "position": "Менеджер",
+                "position_id": 1,
+                "gtf_id": 1,
                 "work_domain": "natural_gas",
                 "employee_level": "engineer"
             }
@@ -182,15 +189,13 @@ class PhoneLoginSerializer(serializers.Serializer):
         required=False, 
         help_text="Полное имя (для новых пользователей)"
     )
-    branch = serializers.CharField(
-        max_length=100, 
+    position_id = serializers.IntegerField(
         required=False, 
-        help_text="Филиал (для новых пользователей)"
+        help_text="ID должности (для новых пользователей)"
     )
-    position = serializers.CharField(
-        max_length=100, 
+    gtf_id = serializers.IntegerField(
         required=False, 
-        help_text="Должность (для новых пользователей)"
+        help_text="ID GTF (для новых пользователей)"
     )
     work_domain = serializers.ChoiceField(
         choices=[('natural_gas', 'Natural Gas'), ('lpg_gas', 'LPG Gas')],
@@ -243,8 +248,8 @@ class PhoneLoginSerializer(serializers.Serializer):
             phone_number=phone_number,
             defaults={
                 'name': attrs.get('name', ''),
-                'branch': attrs.get('branch', ''),
-                'position': attrs.get('position', ''),
+                'position_id': attrs.get('position_id'),
+                'gtf_id': attrs.get('gtf_id'),
                 'work_domain': attrs.get('work_domain', ''),
                 'employee_level': attrs.get('employee_level', ''),
                 'is_phone_verified': True
@@ -255,10 +260,10 @@ class PhoneLoginSerializer(serializers.Serializer):
             # Update user info if provided
             if attrs.get('name'):
                 user.name = attrs.get('name')
-            if attrs.get('branch'):
-                user.branch = attrs.get('branch')
-            if attrs.get('position'):
-                user.position = attrs.get('position')
+            if attrs.get('position_id'):
+                user.position_id = attrs.get('position_id')
+            if attrs.get('gtf_id'):
+                user.gtf_id = attrs.get('gtf_id')
             if attrs.get('work_domain'):
                 user.work_domain = attrs.get('work_domain')
             if attrs.get('employee_level'):
@@ -345,8 +350,8 @@ class UserSearchResponseSerializer(serializers.Serializer):
             name="Обновление профиля",
             value={
                 "name": "Иван Петров",
-                "branch": "Самарканд",
-                "position": "Старший менеджер",
+                "position": 2,
+                "gtf": 2,
                 "work_domain": "lpg_gas",
                 "employee_level": "junior"
             }
@@ -358,22 +363,10 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer[User]):
     
     class Meta:
         model = User
-        fields = ["name", "branch", "position", "employee_level", "work_domain"]
+        fields = ["name", "position", "gtf", "employee_level", "work_domain"]
     
     def validate_name(self, value):
         """Валидация имени."""
         if not value or not value.strip():
             raise serializers.ValidationError(_("Name cannot be empty"))
         return value.strip()
-    
-    def validate_branch(self, value):
-        """Валидация филиала."""
-        if value:
-            return value.strip()
-        return value
-    
-    def validate_position(self, value):
-        """Валидация должности."""
-        if value:
-            return value.strip()
-        return value
