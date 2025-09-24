@@ -1383,7 +1383,7 @@ class DownloadCertificatePDFView(View):
 class GetCertificateDataView(APIView):
     """Get certificate data for completed survey session."""
     
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get(self, request, session_id, *args, **kwargs):
         """Get certificate data for survey session."""
@@ -1481,7 +1481,8 @@ class GetCertificateDataView(APIView):
 )
 class GetUserCertificateDataView(APIView):
     """Get certificate data for user by UUID - returns session with highest score."""
-    
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request, user_uuid, *args, **kwargs):
         """Get certificate data for user's best session."""
         from apps.users.models import User
