@@ -301,7 +301,7 @@ class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericV
         summary="Обновить мой профиль",
         description="""Обновить данные профиля текущего пользователя.
         
-        Позволяет обновить поля: name, branch, position.""",
+        Позволяет обновить поля: name, position, gtf, work_domain, employee_level.""",
         tags=["Пользователи"],
         request=UserProfileUpdateSerializer,
         responses={
@@ -314,11 +314,19 @@ class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericV
                         "items": {"type": "string"},
                         "example": ["Name cannot be empty"]
                     },
-                    "branch": {
+                    "position": {
                         "type": "array",
                         "items": {"type": "string"}
                     },
-                    "position": {
+                    "gtf": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "work_domain": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "employee_level": {
                         "type": "array",
                         "items": {"type": "string"}
                     }
@@ -331,8 +339,10 @@ class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericV
                 request_only=True,
                 value={
                     "name": "Иван Петров",
-                    "branch": "Самарканд",
-                    "position": "Старший менеджер"
+                    "position": 1,
+                    "gtf": 1,
+                    "work_domain": "natural_gas",
+                    "employee_level": "engineer"
                 }
             )
         ]
@@ -431,7 +441,7 @@ class BranchListView(APIView):
 @extend_schema_view(
     get=extend_schema(
         summary="Получить все должности",
-        description="Возвращает список всех уникальных должностей (position) из базы данных пользователей.",
+        description="Возвращает список всех должностей (position) с информацией о филиале и домене работы.",
         responses={
             200: OpenApiTypes.OBJECT,
         }
@@ -442,13 +452,20 @@ class PositionListView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def get(self, request):
-        positions = PositionStaff.objects.all().order_by('name_uz')
+        positions = PositionStaff.objects.select_related('branch').all().order_by('name_uz')
         data = [
             {
                 'id': p.id,
                 'name_uz': p.name_uz,
                 'name_uz_cyrl': p.name_uz_cyrl,
                 'name_ru': p.name_ru,
+                'work_domain': p.work_domain,
+                'branch': {
+                    'id': p.branch.id if p.branch else None,
+                    'name_uz': p.branch.name_uz if p.branch else None,
+                    'name_uz_cyrl': p.branch.name_uz_cyrl if p.branch else None,
+                    'name_ru': p.branch.name_ru if p.branch else None,
+                } if p.branch else None,
             }
             for p in positions
         ]
