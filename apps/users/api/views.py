@@ -412,7 +412,7 @@ class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericV
 )
 class BranchListView(APIView):
     """Get all unique branches."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get(self, request):
         branches = BranchStaff.objects.all().order_by('name_uz')
@@ -439,7 +439,7 @@ class BranchListView(APIView):
 )
 class PositionListView(APIView):
     """Get all unique positions."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get(self, request):
         positions = PositionStaff.objects.all().order_by('name_uz')
@@ -465,7 +465,7 @@ class PositionListView(APIView):
 )
 class GTFStaffListView(APIView):
     """Get all GTFStaff items."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         items = GTFStaff.objects.all().order_by('name_uz')
