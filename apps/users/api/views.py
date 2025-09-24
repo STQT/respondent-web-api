@@ -536,6 +536,14 @@ class RegisterView(APIView):
         extra = {'name': name}
         if position_id:
             extra['position_id'] = position_id
+            # Get work_domain from position
+            try:
+                from apps.users.models import PositionStaff
+                position = PositionStaff.objects.get(id=position_id)
+                if position.work_domain:
+                    extra['work_domain'] = position.work_domain
+            except PositionStaff.DoesNotExist:
+                pass
         if gtf_id:
             extra['gtf_id'] = gtf_id
 
