@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from .forms import UserAdminChangeForm
 from .forms import UserAdminCreationForm
-from .models import User, OTPVerification
+from .models import User, OTPVerification, BranchStaff, PositionStaff, GTFStaff
 
 if settings.DJANGO_ADMIN_FORCE_ALLAUTH:
     # Force the `admin` sign in process to go through the `django-allauth` workflow:
@@ -60,3 +60,24 @@ class OTPVerificationAdmin(admin.ModelAdmin):
     search_fields = ["phone_number"]
     readonly_fields = ["created_at", "expires_at"]
     ordering = ["-created_at"]
+
+
+@admin.register(BranchStaff)
+class BranchStaffAdmin(admin.ModelAdmin):
+    list_display = ["id", "name_uz", "name_uz_cyrl", "name_ru"]
+    search_fields = ["name_uz", "name_uz_cyrl", "name_ru"]
+    ordering = ["name_uz"]
+
+
+@admin.register(PositionStaff)
+class PositionStaffAdmin(admin.ModelAdmin):
+    list_display = ["id", "name_uz", "name_uz_cyrl", "name_ru"]
+    search_fields = ["name_uz", "name_uz_cyrl", "name_ru"]
+    ordering = ["name_uz"]
+
+
+@admin.register(GTFStaff)
+class GTFStaffAdmin(admin.ModelAdmin):
+    list_display = ["id", "name_uz", "name_uz_cyrl", "name_ru"]
+    search_fields = ["name_uz", "name_uz_cyrl", "name_ru"]
+    ordering = ["name_uz"]

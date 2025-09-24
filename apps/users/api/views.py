@@ -14,7 +14,13 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 
-from apps.users.models import User, OTPVerification
+from apps.users.models import (
+    User,
+    OTPVerification,
+    BranchStaff,
+    PositionStaff,
+    GTFStaff,
+)
 from .serializers import (
     UserSerializer, 
     SendOTPSerializer, 
@@ -409,15 +415,17 @@ class BranchListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
-        branches = User.objects.exclude(
-            branch__isnull=True
-        ).exclude(
-            branch__exact=''
-        ).values_list('branch', flat=True).distinct().order_by('branch')
-        
-        return Response({
-            'branches': list(branches)
-        }, status=status.HTTP_200_OK)
+        branches = BranchStaff.objects.all().order_by('name_uz')
+        data = [
+            {
+                'id': b.id,
+                'name_uz': b.name_uz,
+                'name_uz_cyrl': b.name_uz_cyrl,
+                'name_ru': b.name_ru,
+            }
+            for b in branches
+        ]
+        return Response({'branches': data}, status=status.HTTP_200_OK)
 
 
 @extend_schema_view(
@@ -434,12 +442,148 @@ class PositionListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
-        positions = User.objects.exclude(
-            position__isnull=True
-        ).exclude(
-            position__exact=''
-        ).values_list('position', flat=True).distinct().order_by('position')
-        
+        positions = PositionStaff.objects.all().order_by('name_uz')
+        data = [
+            {
+                'id': p.id,
+                'name_uz': p.name_uz,
+                'name_uz_cyrl': p.name_uz_cyrl,
+                'name_ru': p.name_ru,
+            }
+            for p in positions
+        ]
+        return Response({'positions': data}, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Получить все GTF",
+        description="Возвращает список GTFStaff.",
+        responses={200: OpenApiTypes.OBJECT},
+        tags=["Справочники"],
+    )
+)
+class GTFStaffListView(APIView):
+    """Get all GTFStaff items."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        items = GTFStaff.objects.all().order_by('name_uz')
+        data = [
+            {
+                'id': g.id,
+                'name_uz': g.name_uz,
+                'name_uz_cyrl': g.name_uz_cyrl,
+                'name_ru': g.name_ru,
+            }
+            for g in items
+        ]
+        return Response({'gtf': data}, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Регистрация пользователя (телефон + пароль)",
+    description="Создает пользователя по phone_number и password. Опционально: name, branch_id, position_id, gtf_id.",
+    tags=["Аутентификация"],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'phone_number': {'type': 'string', 'example': '+998901234567'},
+                'password': {'type': 'string', 'example': 'secret123'},
+                'name': {'type': 'string', 'example': 'Иван Иванов'},
+                'branch_id': {'type': 'integer'},
+                'position_id': {'type': 'integer'},
+                'gtf_id': {'type': 'integer'},
+            },
+            'required': ['phone_number', 'password']
+        }
+    },
+    responses={200: LoginResponseSerializer, 400: OpenApiTypes.OBJECT}
+)
+class RegisterView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        password = request.data.get('password')
+        name = request.data.get('name', '')
+        branch_id = request.data.get('branch_id')
+        position_id = request.data.get('position_id')
+        gtf_id = request.data.get('gtf_id')
+
+        if not phone_number or not password:
+            return Response({'error': _('phone_number and password are required')}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(phone_number=phone_number).exists():
+            return Response({'error': _('User with this phone already exists')}, status=status.HTTP_400_BAD_REQUEST)
+
+        extra = {'name': name}
+        if branch_id:
+            extra['branch_id'] = branch_id
+        if position_id:
+            extra['position_id'] = position_id
+        if gtf_id:
+            extra['gtf_id'] = gtf_id
+
+        user = User.objects.create_user(phone_number=phone_number, password=password, **extra)
+
+        # Issue tokens
+        refresh = RefreshToken.for_user(user)
+        access = refresh.access_token
+        access['name'] = user.name
+        access['phone_number'] = str(user.phone_number)
+        access['is_moderator'] = user.is_moderator
+
         return Response({
-            'positions': list(positions)
+            'user': UserSerializer(user).data,
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(access),
+            }
+        }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Логин по телефону и паролю",
+    description="Возвращает JWT токены при корректном phone_number/password.",
+    tags=["Аутентификация"],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'phone_number': {'type': 'string', 'example': '+998901234567'},
+                'password': {'type': 'string', 'example': 'secret123'},
+            },
+            'required': ['phone_number', 'password']
+        }
+    },
+    responses={200: TokenResponseSerializer, 401: OpenApiTypes.OBJECT}
+)
+class PasswordLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        password = request.data.get('password')
+        if not phone_number or not password:
+            return Response({'error': _('phone_number and password are required')}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(phone_number=phone_number)
+        except User.DoesNotExist:
+            return Response({'error': _('Invalid credentials')}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.check_password(password):
+            return Response({'error': _('Invalid credentials')}, status=status.HTTP_401_UNAUTHORIZED)
+
+        refresh = RefreshToken.for_user(user)
+        access = refresh.access_token
+        access['name'] = user.name
+        access['phone_number'] = str(user.phone_number)
+        access['is_moderator'] = user.is_moderator
+
+        return Response({
+            'access': str(access),
+            'refresh': str(refresh),
         }, status=status.HTTP_200_OK)

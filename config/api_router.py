@@ -11,7 +11,10 @@ from apps.users.api.views import (
     PhoneLoginView,
     CustomTokenObtainPairView,
     BranchListView,
-    PositionListView
+    PositionListView,
+    GTFStaffListView,
+    RegisterView,
+    PasswordLoginView,
 )
 from apps.surveys.api.views import (
     SurveyViewSet,
@@ -42,6 +45,8 @@ urlpatterns = [
     path("auth/send-otp/", SendOTPView.as_view(), name="send-otp"),
     path("auth/verify-otp/", VerifyOTPView.as_view(), name="verify-otp"),
     path("auth/login/", PhoneLoginView.as_view(), name="phone-login"),
+    path("auth/register/", RegisterView.as_view(), name="register"),
+    path("auth/password-login/", PasswordLoginView.as_view(), name="password-login"),
     path("auth/token/", CustomTokenObtainPairView.as_view(), name="token-obtain-pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     
@@ -54,6 +59,7 @@ urlpatterns = [
     # User data endpoints
     path("branches/", BranchListView.as_view(), name="branches-list"),
     path("positions/", PositionListView.as_view(), name="positions-list"),
+    path("gtf/", GTFStaffListView.as_view(), name="gtf-list"),
     path("certificate/", include("apps.surveys.urls", namespace="surveys")),
     
     # Include router URLs

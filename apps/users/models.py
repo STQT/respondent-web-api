@@ -37,6 +37,32 @@ class UserManager(BaseUserManager):
         
         return self.create_user(phone_number, password, **extra_fields)
 
+class GTFStaff(models.Model):
+    """Model for storing GTF staff."""
+    name_uz = models.CharField(_("Choice Name (Uzbek Latin)"), max_length=500)
+    name_uz_cyrl = models.CharField(_("Choice Name (Uzbek Cyrillic)"), max_length=500, blank=True)
+    name_ru = models.CharField(_("Choice Name (Russian)"), max_length=500, blank=True)
+    
+    def __str__(self):
+        return self.name_uz
+
+class BranchStaff(models.Model):
+    """Model for storing Branch staff."""
+    name_uz = models.CharField(_("Choice Name (Uzbek Latin)"), max_length=500)
+    name_uz_cyrl = models.CharField(_("Choice Name (Uzbek Cyrillic)"), max_length=500, blank=True)
+    name_ru = models.CharField(_("Choice Name (Russian)"), max_length=500, blank=True)
+    
+    def __str__(self):
+        return self.name_uz
+
+class PositionStaff(models.Model):
+    """Model for storing Position staff."""
+    name_uz = models.CharField(_("Choice Name (Uzbek Latin)"), max_length=500)
+    name_uz_cyrl = models.CharField(_("Choice Name (Uzbek Cyrillic)"), max_length=500, blank=True)
+    name_ru = models.CharField(_("Choice Name (Russian)"), max_length=500, blank=True)
+    
+    def __str__(self):
+        return self.name_uz
 
 class User(AbstractUser):
     """
@@ -46,13 +72,15 @@ class User(AbstractUser):
     """
 
     # Phone authentication
-    phone_number = PhoneNumberField(_("Phone Number"), unique=True, null=True, blank=True)
+    # Allow any unique identifier (not strictly validated as a phone)
+    phone_number = models.CharField(_("Phone Number"), max_length=32, unique=True, null=True, blank=True)
     is_phone_verified = models.BooleanField(_("Phone Verified"), default=False)
     
     # User profile fields
     name = models.CharField(_("Full Name"), max_length=255, blank=True)
-    branch = models.CharField(_("Branch"), max_length=100, blank=True)
-    position = models.CharField(_("Position"), max_length=100, blank=True)
+    branch = models.ForeignKey(BranchStaff, on_delete=models.SET_NULL, verbose_name=_("Branch"), max_length=100, blank=True, null=True)
+    position = models.ForeignKey(PositionStaff, on_delete=models.SET_NULL, verbose_name=_("Position"), max_length=100, blank=True, null=True)
+    gtf = models.ForeignKey(GTFStaff, on_delete=models.SET_NULL, verbose_name=_("GTF"), blank=True, null=True)
     work_domain = models.CharField(
         _("Work Domain"), max_length=100, blank=True, choices=UserWorkDomainChoices.choices)
     employee_level = models.CharField(_("Employee Level"), max_length=100, blank=True, choices=EmployeeLevelChoices.choices)

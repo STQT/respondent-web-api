@@ -1179,6 +1179,7 @@ class CurrentSessionView(APIView):
 from django.views import View
 from django.http import HttpResponse
 import requests
+import time
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1254,6 +1255,8 @@ class DownloadCertificatePDFView(View):
         }
         
         try:
+            # Give the certificate page time to fully render on the frontend
+            time.sleep(4)
             logger.info(f"Converting certificate to PDF: {certificate_url}")
             
             # Send request to Gotenberg with multipart/form-data
@@ -1608,6 +1611,8 @@ class DownloadUserCertificatePDFView(View):
         }
         
         try:
+            # Give the certificate page time to fully render on the frontend
+            time.sleep(4)
             logger.info(f"Converting user certificate to PDF: {certificate_url}")
             
             # Send request to Gotenberg with multipart/form-data
