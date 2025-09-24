@@ -6,7 +6,7 @@ class UserWorkDomainChoices(models.TextChoices):
     """Choices for user work domain."""
     NATURALGAS = 'natural_gas', _('Natural Gas')
     LPGGAS = 'lpg_gas', _('LPG Gas')
-
+    BOTH = 'both', _('Both')
 
 class EmployeeLevelChoices(models.TextChoices):
     """Choices for employee level."""
