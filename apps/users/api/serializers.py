@@ -243,16 +243,25 @@ class PhoneLoginSerializer(serializers.Serializer):
             if otp.is_expired():
                 raise serializers.ValidationError(_("OTP code has expired"))
         
-        # Get work_domain from position if position_id is provided
-        work_domain = attrs.get('work_domain', '')
-        if attrs.get('position_id') and not work_domain:
+        # Validate position_id if provided
+        if attrs.get('position_id'):
             try:
                 from apps.users.models import PositionStaff
                 position = PositionStaff.objects.get(id=attrs.get('position_id'))
-                if position.work_domain:
+                work_domain = attrs.get('work_domain', '')
+                if not work_domain and position.work_domain:
                     work_domain = position.work_domain
+                attrs['work_domain'] = work_domain
             except PositionStaff.DoesNotExist:
-                pass
+                raise serializers.ValidationError(_("Invalid position_id"))
+        
+        # Validate gtf_id if provided
+        if attrs.get('gtf_id'):
+            try:
+                from apps.users.models import GTFStaff
+                GTFStaff.objects.get(id=attrs.get('gtf_id'))
+            except GTFStaff.DoesNotExist:
+                raise serializers.ValidationError(_("Invalid gtf_id"))
 
         # Get or create user
         user, created = User.objects.get_or_create(

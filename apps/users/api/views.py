@@ -535,17 +535,24 @@ class RegisterView(APIView):
 
         extra = {'name': name}
         if position_id:
-            extra['position_id'] = position_id
-            # Get work_domain from position
+            # Validate position exists
             try:
                 from apps.users.models import PositionStaff
                 position = PositionStaff.objects.get(id=position_id)
+                extra['position_id'] = position_id
                 if position.work_domain:
                     extra['work_domain'] = position.work_domain
             except PositionStaff.DoesNotExist:
-                pass
+                return Response({'error': _('Invalid position_id')}, status=status.HTTP_400_BAD_REQUEST)
+        
         if gtf_id:
-            extra['gtf_id'] = gtf_id
+            # Validate GTF exists
+            try:
+                from apps.users.models import GTFStaff
+                GTFStaff.objects.get(id=gtf_id)
+                extra['gtf_id'] = gtf_id
+            except GTFStaff.DoesNotExist:
+                return Response({'error': _('Invalid gtf_id')}, status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.create_user(phone_number=phone_number, password=password, **extra)
 
