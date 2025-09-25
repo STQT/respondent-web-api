@@ -131,7 +131,7 @@ class Command(BaseCommand):
                     
                     if created_count <= 3:  # Показываем первых 3 для примера
                         self.stdout.write(
-                            f'Создан пользователь: {user.name} ({user.phone_number}) - {user.branch}, {user.position}'
+                            f'Создан пользователь: {user.name} ({user.phone_number}) - {user.position.branch.name_uz if user.position and user.position.branch else "N/A"}, {user.position.name_uz if user.position else "N/A"}'
                         )
                     elif created_count == 4:
                         self.stdout.write('...')

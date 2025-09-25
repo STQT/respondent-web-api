@@ -565,8 +565,8 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                     'id': session.user.id,
                     'name': session.user.name,
                     'phone_number': str(session.user.phone_number),
-                    'branch': session.user.branch,
-                    'position': session.user.position,
+                    'branch': session.user.position.branch.name_uz if session.user.position and session.user.position.branch else None,
+                    'position': session.user.position.name_uz if session.user.position else None,
                     'work_domain': session.user.work_domain,
                     'employee_level': session.user.employee_level
                 },
@@ -701,8 +701,8 @@ class ModeratorSurveyStatsViewSet(ReadOnlyModelViewSet):
                     'id': session.user.id,
                     'name': session.user.name,
                     'phone_number': str(session.user.phone_number),
-                    'branch': session.user.branch,
-                    'position': session.user.position
+                    'branch': session.user.position.branch.name_uz if session.user.position and session.user.position.branch else None,
+                    'position': session.user.position.name_uz if session.user.position else None
                 },
                 'attempt_number': session.attempt_number,
                 'status': session.status,
@@ -868,8 +868,8 @@ class ModeratorDashboardView(APIView):
         for user in top_performers:
             top_performers_data.append({
                 'name': user.name,
-                'branch': user.branch,
-                'position': user.position,
+                'branch': user.position.branch.name_uz if user.position and user.position.branch else None,
+                'position': user.position.name_uz if user.position else None,
                 'average_score': round(float(user.avg_score), 2) if user.avg_score else 0
             })
         

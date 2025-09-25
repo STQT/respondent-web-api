@@ -403,8 +403,8 @@ class CertificateDataSerializer(serializers.ModelSerializer):
     """Serializer for certificate data."""
     
     user_name = serializers.CharField(source='user.name', read_only=True)
-    user_branch = serializers.CharField(source='user.branch', read_only=True)
-    user_position = serializers.CharField(source='user.position', read_only=True)
+    user_branch = serializers.CharField(source='user.position.branch.name_uz', read_only=True)
+    user_position = serializers.CharField(source='user.position.name_uz', read_only=True)
     user_work_domain = serializers.CharField(source='user.get_work_domain_display', read_only=True)
     user_employee_level = serializers.CharField(source='user.get_employee_level_display', read_only=True)
     survey_title = serializers.CharField(source='survey.title', read_only=True)
