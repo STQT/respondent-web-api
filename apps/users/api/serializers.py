@@ -20,14 +20,25 @@ from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
                 "phone_number": "+998901234567",
                 "name": "Иван Иванов",
                 "position": 1,
-                "branch_name": "Ташкент",
-                "position_name": "Менеджер",
                 "gtf": 1,
-                "gtf_name": "GTF-1",
                 "work_domain": "natural_gas",
                 "employee_level": "engineer",
                 "is_moderator": False,
-                "is_phone_verified": True
+                "is_phone_verified": True,
+                # Основные поля (обратная совместимость)
+                "branch_name": "Ташкентский филиал",
+                "position_name": "Менеджер",
+                "gtf_name": "ГТФ-1",
+                # Мультиязычные поля
+                "branch_name_uz": "Ташкентский филиал",
+                "branch_name_uz_cyrl": "Ташкентский филиал",
+                "branch_name_ru": "Ташкентский филиал",
+                "position_name_uz": "Менеджер",
+                "position_name_uz_cyrl": "Менеджер",
+                "position_name_ru": "Менеджер",
+                "gtf_name_uz": "ГТФ-1",
+                "gtf_name_uz_cyrl": "ГТФ-1",
+                "gtf_name_ru": "ГТФ-1"
             }
         )
     ]
@@ -35,14 +46,43 @@ from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 class UserSerializer(serializers.ModelSerializer[User]):
     """Сериализатор для модели пользователя."""
     
+    # Основные поля (для обратной совместимости)
     branch_name = serializers.CharField(source='position.branch.name_uz', read_only=True)
     position_name = serializers.CharField(source='position.name_uz', read_only=True)
     gtf_name = serializers.CharField(source='gtf.name_uz', read_only=True)
     
+    # Мультиязычные поля
+    branch_name_uz = serializers.CharField(source='position.branch.name_uz', read_only=True)
+    branch_name_uz_cyrl = serializers.CharField(source='position.branch.name_uz_cyrl', read_only=True)
+    branch_name_ru = serializers.CharField(source='position.branch.name_ru', read_only=True)
+    
+    position_name_uz = serializers.CharField(source='position.name_uz', read_only=True)
+    position_name_uz_cyrl = serializers.CharField(source='position.name_uz_cyrl', read_only=True)
+    position_name_ru = serializers.CharField(source='position.name_ru', read_only=True)
+    
+    gtf_name_uz = serializers.CharField(source='gtf.name_uz', read_only=True)
+    gtf_name_uz_cyrl = serializers.CharField(source='gtf.name_uz_cyrl', read_only=True)
+    gtf_name_ru = serializers.CharField(source='gtf.name_ru', read_only=True)
+    
     class Meta:
         model = User
-        fields = ["id", "phone_number", "name", "position", "branch_name", "position_name", "gtf", "gtf_name", "work_domain", "employee_level", "is_moderator", "is_phone_verified"]
-        read_only_fields = ["id", "is_phone_verified", "branch_name", "position_name", "gtf_name"]
+        fields = [
+            "id", "phone_number", "name", "position", "gtf", "work_domain", "employee_level", 
+            "is_moderator", "is_phone_verified",
+            # Основные поля (обратная совместимость)
+            "branch_name", "position_name", "gtf_name",
+            # Мультиязычные поля
+            "branch_name_uz", "branch_name_uz_cyrl", "branch_name_ru",
+            "position_name_uz", "position_name_uz_cyrl", "position_name_ru",
+            "gtf_name_uz", "gtf_name_uz_cyrl", "gtf_name_ru"
+        ]
+        read_only_fields = [
+            "id", "is_phone_verified", 
+            "branch_name", "position_name", "gtf_name",
+            "branch_name_uz", "branch_name_uz_cyrl", "branch_name_ru",
+            "position_name_uz", "position_name_uz_cyrl", "position_name_ru",
+            "gtf_name_uz", "gtf_name_uz_cyrl", "gtf_name_ru"
+        ]
 
 
 class UserCreateSerializer(serializers.ModelSerializer[User]):

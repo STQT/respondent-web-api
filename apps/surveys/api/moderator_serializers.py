@@ -10,8 +10,19 @@ from apps.surveys.models import (
 class ModeratorUserListSerializer(serializers.ModelSerializer):
     """Serializer for moderator user list view."""
     
+    # Основные поля (обратная совместимость)
     branch = serializers.CharField(source='position.branch.name_uz', read_only=True)
     position_name = serializers.CharField(source='position.name_uz', read_only=True)
+    
+    # Мультиязычные поля
+    branch_uz = serializers.CharField(source='position.branch.name_uz', read_only=True)
+    branch_uz_cyrl = serializers.CharField(source='position.branch.name_uz_cyrl', read_only=True)
+    branch_ru = serializers.CharField(source='position.branch.name_ru', read_only=True)
+    
+    position_name_uz = serializers.CharField(source='position.name_uz', read_only=True)
+    position_name_uz_cyrl = serializers.CharField(source='position.name_uz_cyrl', read_only=True)
+    position_name_ru = serializers.CharField(source='position.name_ru', read_only=True)
+    
     last_survey_attempt = serializers.SerializerMethodField()
     total_attempts = serializers.SerializerMethodField()
     best_score = serializers.SerializerMethodField()
@@ -20,7 +31,12 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'phone_number', 'name', 'branch', 'position_name', 'position',
+            'id', 'phone_number', 'name', 'position',
+            # Основные поля (обратная совместимость)
+            'branch', 'position_name',
+            # Мультиязычные поля
+            'branch_uz', 'branch_uz_cyrl', 'branch_ru',
+            'position_name_uz', 'position_name_uz_cyrl', 'position_name_ru',
             'last_survey_attempt', 'total_attempts', 'best_score', 'status',
             'is_phone_verified', 'date_joined'
         ]
@@ -62,15 +78,31 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
 class ModeratorUserDetailSerializer(serializers.ModelSerializer):
     """Serializer for moderator user detail view."""
     
+    # Основные поля (обратная совместимость)
     branch = serializers.CharField(source='position.branch.name_uz', read_only=True)
     position_name = serializers.CharField(source='position.name_uz', read_only=True)
+    
+    # Мультиязычные поля
+    branch_uz = serializers.CharField(source='position.branch.name_uz', read_only=True)
+    branch_uz_cyrl = serializers.CharField(source='position.branch.name_uz_cyrl', read_only=True)
+    branch_ru = serializers.CharField(source='position.branch.name_ru', read_only=True)
+    
+    position_name_uz = serializers.CharField(source='position.name_uz', read_only=True)
+    position_name_uz_cyrl = serializers.CharField(source='position.name_uz_cyrl', read_only=True)
+    position_name_ru = serializers.CharField(source='position.name_ru', read_only=True)
+    
     survey_history = serializers.SerializerMethodField()
     total_statistics = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = [
-            'id', 'phone_number', 'name', 'branch', 'position_name', 'position',
+            'id', 'phone_number', 'name', 'position',
+            # Основные поля (обратная совместимость)
+            'branch', 'position_name',
+            # Мультиязычные поля
+            'branch_uz', 'branch_uz_cyrl', 'branch_ru',
+            'position_name_uz', 'position_name_uz_cyrl', 'position_name_ru',
             'is_phone_verified', 'date_joined', 'last_login',
             'survey_history', 'total_statistics'
         ]
@@ -128,8 +160,19 @@ class ModeratorUserDetailSerializer(serializers.ModelSerializer):
 class ModeratorUserOverviewSerializer(serializers.ModelSerializer):
     """Serializer for moderator users overview list."""
     
+    # Основные поля (обратная совместимость)
     branch = serializers.CharField(source='position.branch.name_uz', read_only=True)
     position_name = serializers.CharField(source='position.name_uz', read_only=True)
+    
+    # Мультиязычные поля
+    branch_uz = serializers.CharField(source='position.branch.name_uz', read_only=True)
+    branch_uz_cyrl = serializers.CharField(source='position.branch.name_uz_cyrl', read_only=True)
+    branch_ru = serializers.CharField(source='position.branch.name_ru', read_only=True)
+    
+    position_name_uz = serializers.CharField(source='position.name_uz', read_only=True)
+    position_name_uz_cyrl = serializers.CharField(source='position.name_uz_cyrl', read_only=True)
+    position_name_ru = serializers.CharField(source='position.name_ru', read_only=True)
+    
     last_score = serializers.SerializerMethodField()
     attempts_count = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
@@ -137,7 +180,12 @@ class ModeratorUserOverviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'name', 'branch', 'position_name', 'position', 
+            'id', 'name', 'position',
+            # Основные поля (обратная совместимость)
+            'branch', 'position_name',
+            # Мультиязычные поля
+            'branch_uz', 'branch_uz_cyrl', 'branch_ru',
+            'position_name_uz', 'position_name_uz_cyrl', 'position_name_ru',
             'last_score', 'attempts_count', 'status'
         ]
     

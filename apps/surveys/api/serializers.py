@@ -403,8 +403,20 @@ class CertificateDataSerializer(serializers.ModelSerializer):
     """Serializer for certificate data."""
     
     user_name = serializers.CharField(source='user.name', read_only=True)
+    
+    # Основные поля (обратная совместимость)
     user_branch = serializers.CharField(source='user.position.branch.name_uz', read_only=True)
     user_position = serializers.CharField(source='user.position.name_uz', read_only=True)
+    
+    # Мультиязычные поля
+    user_branch_uz = serializers.CharField(source='user.position.branch.name_uz', read_only=True)
+    user_branch_uz_cyrl = serializers.CharField(source='user.position.branch.name_uz_cyrl', read_only=True)
+    user_branch_ru = serializers.CharField(source='user.position.branch.name_ru', read_only=True)
+    
+    user_position_uz = serializers.CharField(source='user.position.name_uz', read_only=True)
+    user_position_uz_cyrl = serializers.CharField(source='user.position.name_uz_cyrl', read_only=True)
+    user_position_ru = serializers.CharField(source='user.position.name_ru', read_only=True)
+    
     user_work_domain = serializers.CharField(source='user.get_work_domain_display', read_only=True)
     user_employee_level = serializers.CharField(source='user.get_employee_level_display', read_only=True)
     survey_title = serializers.CharField(source='survey.title', read_only=True)
@@ -415,7 +427,12 @@ class CertificateDataSerializer(serializers.ModelSerializer):
         model = SurveySession
         fields = [
             'id', 'certificate_order', 'attempt_number',
-            'user_name', 'user_branch', 'user_position', 
+            'user_name', 
+            # Основные поля (обратная совместимость)
+            'user_branch', 'user_position',
+            # Мультиязычные поля
+            'user_branch_uz', 'user_branch_uz_cyrl', 'user_branch_ru',
+            'user_position_uz', 'user_position_uz_cyrl', 'user_position_ru',
             'user_work_domain', 'user_employee_level',
             'survey_title', 'survey_description',
             'score', 'total_points', 'percentage', 'is_passed',
