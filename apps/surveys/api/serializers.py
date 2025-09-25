@@ -26,9 +26,9 @@ class ChoiceSerializer(serializers.ModelSerializer):
     """Serializer for question choices."""
     
     text = serializers.SerializerMethodField(help_text="Текст варианта ответа")
-    text_uz = serializers.CharField(source='text_uz', read_only=True, help_text="Текст на узбекском языке (латиница)")
-    text_uz_cyrl = serializers.CharField(source='text_uz_cyrl', read_only=True, help_text="Текст на узбекском языке (кириллица)")
-    text_ru = serializers.CharField(source='text_ru', read_only=True, help_text="Текст на русском языке")
+    text_uz = serializers.CharField(read_only=True, help_text="Текст на узбекском языке (латиница)")
+    text_uz_cyrl = serializers.CharField(read_only=True, help_text="Текст на узбекском языке (кириллица)")
+    text_ru = serializers.CharField(read_only=True, help_text="Текст на русском языке")
     
     class Meta:
         model = Choice
@@ -91,9 +91,9 @@ class QuestionSerializer(serializers.ModelSerializer):
     """Serializer for survey questions."""
     
     text = serializers.SerializerMethodField(help_text="Текст вопроса")
-    text_uz = serializers.CharField(source='text_uz', read_only=True, help_text="Текст вопроса на узбекском языке (латиница)")
-    text_uz_cyrl = serializers.CharField(source='text_uz_cyrl', read_only=True, help_text="Текст вопроса на узбекском языке (кириллица)")
-    text_ru = serializers.CharField(source='text_ru', read_only=True, help_text="Текст вопроса на русском языке")
+    text_uz = serializers.CharField(read_only=True, help_text="Текст вопроса на узбекском языке (латиница)")
+    text_uz_cyrl = serializers.CharField(read_only=True, help_text="Текст вопроса на узбекском языке (кириллица)")
+    text_ru = serializers.CharField(read_only=True, help_text="Текст вопроса на русском языке")
     choices = ChoiceSerializer(many=True, read_only=True, help_text="Варианты ответов")
     
     class Meta:
