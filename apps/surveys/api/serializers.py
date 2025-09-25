@@ -14,6 +14,9 @@ from apps.surveys.models import (
             value={
                 "id": 1,
                 "text": "Правильный ответ",
+                "text_uz": "To'g'ri javob",
+                "text_uz_cyrl": "Тўғри жавоб",
+                "text_ru": "Правильный ответ",
                 "order": 1
             }
         )
@@ -23,10 +26,13 @@ class ChoiceSerializer(serializers.ModelSerializer):
     """Serializer for question choices."""
     
     text = serializers.SerializerMethodField(help_text="Текст варианта ответа")
+    text_uz = serializers.CharField(source='text_uz', read_only=True, help_text="Текст на узбекском языке (латиница)")
+    text_uz_cyrl = serializers.CharField(source='text_uz_cyrl', read_only=True, help_text="Текст на узбекском языке (кириллица)")
+    text_ru = serializers.CharField(source='text_ru', read_only=True, help_text="Текст на русском языке")
     
     class Meta:
         model = Choice
-        fields = ['id', 'text', 'order']
+        fields = ['id', 'text', 'text_uz', 'text_uz_cyrl', 'text_ru', 'order']
     
     def get_text(self, obj):
         """Get localized choice text."""
@@ -42,6 +48,9 @@ class ChoiceSerializer(serializers.ModelSerializer):
                 "id": 1,
                 "question_type": "single",
                 "text": "Какой язык программирования вы предпочитаете?",
+                "text_uz": "Qaysi dasturlash tilini afzal ko'rasiz?",
+                "text_uz_cyrl": "Қайси дастурлаш тилини афзал кўрасиз?",
+                "text_ru": "Какой язык программирования вы предпочитаете?",
                 "image": None,
                 "video": None,
                 "points": 5,
@@ -49,9 +58,30 @@ class ChoiceSerializer(serializers.ModelSerializer):
                 "category": "safety_logic_psychology",
                 "work_domain": "natural_gas",
                 "choices": [
-                    {"id": 1, "text": "Python", "order": 1},
-                    {"id": 2, "text": "JavaScript", "order": 2},
-                    {"id": 3, "text": "Java", "order": 3}
+                    {
+                        "id": 1, 
+                        "text": "Python", 
+                        "text_uz": "Python", 
+                        "text_uz_cyrl": "Python", 
+                        "text_ru": "Python", 
+                        "order": 1
+                    },
+                    {
+                        "id": 2, 
+                        "text": "JavaScript", 
+                        "text_uz": "JavaScript", 
+                        "text_uz_cyrl": "JavaScript", 
+                        "text_ru": "JavaScript", 
+                        "order": 2
+                    },
+                    {
+                        "id": 3, 
+                        "text": "Java", 
+                        "text_uz": "Java", 
+                        "text_uz_cyrl": "Java", 
+                        "text_ru": "Java", 
+                        "order": 3
+                    }
                 ]
             }
         )
@@ -61,13 +91,16 @@ class QuestionSerializer(serializers.ModelSerializer):
     """Serializer for survey questions."""
     
     text = serializers.SerializerMethodField(help_text="Текст вопроса")
+    text_uz = serializers.CharField(source='text_uz', read_only=True, help_text="Текст вопроса на узбекском языке (латиница)")
+    text_uz_cyrl = serializers.CharField(source='text_uz_cyrl', read_only=True, help_text="Текст вопроса на узбекском языке (кириллица)")
+    text_ru = serializers.CharField(source='text_ru', read_only=True, help_text="Текст вопроса на русском языке")
     choices = ChoiceSerializer(many=True, read_only=True, help_text="Варианты ответов")
     
     class Meta:
         model = Question
         fields = [
-            'id', 'question_type', 'text', 'image', 'video', 
-            'points', 'order', 'category', 'work_domain', 'choices'
+            'id', 'question_type', 'text', 'text_uz', 'text_uz_cyrl', 'text_ru',
+            'image', 'video', 'points', 'order', 'category', 'work_domain', 'choices'
         ]
     
     def get_text(self, obj):
