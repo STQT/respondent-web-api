@@ -19,8 +19,10 @@ if settings.DJANGO_ADMIN_FORCE_ALLAUTH:
 class UserAdmin(admin.ModelAdmin):
     form = UserAdminChangeForm
     add_form = UserAdminCreationForm
+    readonly_fields = ("last_login", "date_joined")
     fieldsets = (
-        (None, {"fields": ("phone_number", "password")}),
+        (None, {"fields": ("phone_number",)}),
+        (_("Password"), {"fields": ("password1", "password2")}),
         (_("Personal info"), {"fields": ("name", "position", "gtf", "work_domain", "employee_level")}),
         (_("Phone Verification"), {"fields": ("is_phone_verified",)}),
         (
@@ -43,14 +45,38 @@ class UserAdmin(admin.ModelAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("phone_number", "name", "position", "gtf", "work_domain", "employee_level", "is_moderator", "password1", "password2"),
+                "fields": ("phone_number", "password1", "password2"),
+            },
+        ),
+        (
+            _("Personal info"),
+            {
+                "fields": ("name", "position", "gtf", "work_domain", "employee_level"),
+            },
+        ),
+        (
+            _("Permissions"),
+            {
+                "fields": ("is_moderator",),
             },
         ),
     )
-    list_display = ["phone_number", "name", "position", "gtf", "work_domain", "employee_level", "is_moderator", "is_phone_verified", "is_superuser"]
+    list_display = ["phone_number", "name", "get_position_name", "get_gtf_name", "work_domain", "employee_level", "is_moderator", "is_phone_verified", "is_superuser"]
     list_filter = ["is_staff", "is_superuser", "is_active", "is_moderator", "is_phone_verified", "position", "gtf", "work_domain", "employee_level"]
     search_fields = ["name", "phone_number", "position__name_uz", "gtf__name_uz"]
     ordering = ["phone_number"]
+    
+    def get_position_name(self, obj):
+        """Получить название должности"""
+        return obj.position.name_uz if obj.position else "-"
+    get_position_name.short_description = "Должность"
+    get_position_name.admin_order_field = "position__name_uz"
+    
+    def get_gtf_name(self, obj):
+        """Получить название GTF"""
+        return obj.gtf.name_uz if obj.gtf else "-"
+    get_gtf_name.short_description = "GTF"
+    get_gtf_name.admin_order_field = "gtf__name_uz"
 
 
 @admin.register(OTPVerification)
