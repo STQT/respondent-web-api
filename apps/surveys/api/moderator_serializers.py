@@ -63,12 +63,12 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
         return SurveySession.objects.filter(user=obj).count()
     
     def get_best_score(self, obj):
-        """Get best score across all surveys."""
+        """Get best score in points across all surveys."""
         best_session = SurveySession.objects.filter(
             user=obj, 
             status='completed'
         ).order_by('-percentage').first()
-        return float(best_session.percentage) if best_session and best_session.percentage else None
+        return best_session.score if best_session and best_session.score else 0
     
     def get_status(self, obj):
         """Get current user status."""
