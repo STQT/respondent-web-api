@@ -23,31 +23,33 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
     position_name_uz_cyrl = serializers.CharField(source='position.name_uz_cyrl', read_only=True)
     position_name_ru = serializers.CharField(source='position.name_ru', read_only=True)
     
-    # GTF fields
-    gtf_uz = serializers.CharField(source='gtf.name_uz', read_only=True)
-    gtf_uz_cyrl = serializers.CharField(source='gtf.name_uz_cyrl', read_only=True)
-    gtf_ru = serializers.CharField(source='gtf.name_ru', read_only=True)
+    # GTF поля (обратная совместимость)
+    gtf = serializers.CharField(source='position.branch.gtf.name_uz', read_only=True)
+    
+    # GTF мультиязычные поля
+    gtf_uz = serializers.CharField(source='position.branch.gtf.name_uz', read_only=True)
+    gtf_uz_cyrl = serializers.CharField(source='position.branch.gtf.name_uz_cyrl', read_only=True)
+    gtf_ru = serializers.CharField(source='position.branch.gtf.name_ru', read_only=True)
     
     last_survey_attempt = serializers.SerializerMethodField()
     total_attempts = serializers.SerializerMethodField()
     best_score = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
     total_question_count = serializers.SerializerMethodField()
     total_correct_answers = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = [
             'id', 'phone_number', 'name', 'position',
             # Основные поля (обратная совместимость)
-            'branch', 'position_name',
+            'branch', 'position_name', 'gtf',
             # Мультиязычные поля
             'branch_uz', 'branch_uz_cyrl', 'branch_ru',
             'position_name_uz', 'position_name_uz_cyrl', 'position_name_ru',
-            # GTF поля
             'gtf_uz', 'gtf_uz_cyrl', 'gtf_ru',
-            'last_survey_attempt', 'total_attempts', 'best_score', 
-            'total_question_count', 'total_correct_answers', 'status',
+            'last_survey_attempt', 'total_attempts', 'best_score', 'status',
+            'total_question_count', 'total_correct_answers',
             'is_phone_verified', 'date_joined'
         ]
     
@@ -68,26 +70,6 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
         ).order_by('-percentage').first()
         return float(best_session.percentage) if best_session and best_session.percentage else None
     
-    def get_total_question_count(self, obj):
-        """Get total number of questions answered across all sessions."""
-        from apps.surveys.models import SessionQuestion
-        total_questions = SessionQuestion.objects.filter(
-            session__user=obj,
-            session__status='completed',
-            is_answered=True
-        ).count()
-        return total_questions
-    
-    def get_total_correct_answers(self, obj):
-        """Get total number of correct answers across all sessions."""
-        from apps.surveys.models import Answer
-        total_correct = Answer.objects.filter(
-            session__user=obj,
-            session__status='completed',
-            is_correct=True
-        ).count()
-        return total_correct
-    
     def get_status(self, obj):
         """Get current user status."""
         active_session = SurveySession.objects.filter(
@@ -103,6 +85,22 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
             return last_session.status
         
         return 'never_started'
+    
+    def get_total_question_count(self, obj):
+        """Get total number of questions answered by user."""
+        from apps.surveys.models import SessionQuestion
+        return SessionQuestion.objects.filter(
+            session__user=obj,
+            is_answered=True
+        ).count()
+    
+    def get_total_correct_answers(self, obj):
+        """Get total number of correct answers by user."""
+        from apps.surveys.models import Answer
+        return Answer.objects.filter(
+            session_question__session__user=obj,
+            is_correct=True
+        ).count()
 
 
 class ModeratorUserDetailSerializer(serializers.ModelSerializer):

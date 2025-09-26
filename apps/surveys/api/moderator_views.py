@@ -525,6 +525,9 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                         {
                             'id': choice.id,
                             'text': choice.get_text('ru'),
+                            'text_uz': choice.text_uz,
+                            'text_uz_cyrl': choice.text_uz_cyrl,
+                            'text_ru': choice.text_ru,
                             'is_correct': choice.is_correct
                         }
                         for choice in answer.selected_choices.all()
@@ -542,6 +545,9 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
                 'question': {
                     'id': question.id,
                     'text': question.get_text('ru'),
+                    'text_uz': question.text_uz,
+                    'text_uz_cyrl': question.text_uz_cyrl,
+                    'text_ru': question.text_ru,
                     'question_type': question.question_type,
                     'category': question.category,
                     'work_domain': question.work_domain,
