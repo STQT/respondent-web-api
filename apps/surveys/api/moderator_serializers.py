@@ -98,7 +98,7 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
         """Get total number of correct answers by user."""
         from apps.surveys.models import Answer
         return Answer.objects.filter(
-            session_question__session__user=obj,
+            session__user=obj,
             is_correct=True
         ).count()
 
