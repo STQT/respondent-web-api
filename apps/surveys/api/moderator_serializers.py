@@ -24,12 +24,12 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
     position_name_ru = serializers.CharField(source='position.name_ru', read_only=True)
     
     # GTF поля (обратная совместимость)
-    gtf = serializers.CharField(source='position.branch.gtf.name_uz', read_only=True)
+    gtf = serializers.CharField(source='gtf.name_uz', read_only=True)
     
     # GTF мультиязычные поля
-    gtf_uz = serializers.CharField(source='position.branch.gtf.name_uz', read_only=True)
-    gtf_uz_cyrl = serializers.CharField(source='position.branch.gtf.name_uz_cyrl', read_only=True)
-    gtf_ru = serializers.CharField(source='position.branch.gtf.name_ru', read_only=True)
+    gtf_uz = serializers.CharField(source='gtf.name_uz', read_only=True)
+    gtf_uz_cyrl = serializers.CharField(source='gtf.name_uz_cyrl', read_only=True)
+    gtf_ru = serializers.CharField(source='gtf.name_ru', read_only=True)
     
     last_survey_attempt = serializers.SerializerMethodField()
     total_attempts = serializers.SerializerMethodField()
