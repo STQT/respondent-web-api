@@ -87,7 +87,7 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
         return 'never_started'
     
     def get_total_question_count(self, obj):
-        """Get total number of questions from user's last survey session."""
+        """Get total number of questions in user's last survey session."""
         from apps.surveys.models import SessionQuestion, SurveySession
         
         # Get the user's most recent completed session
@@ -99,10 +99,9 @@ class ModeratorUserListSerializer(serializers.ModelSerializer):
         if not last_session:
             return 0
         
-        # Count questions only from the last session
+        # Count all questions in the session (not just answered ones)
         return SessionQuestion.objects.filter(
-            session=last_session,
-            is_answered=True
+            session=last_session
         ).count()
     
     def get_total_correct_answers(self, obj):
