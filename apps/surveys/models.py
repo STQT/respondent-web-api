@@ -384,6 +384,19 @@ class SurveySession(models.Model):
             user_work_domain=self.user.work_domain,
             user_employee_level=self.user.employee_level
         )
+        
+        # If no questions found, try without work domain filter
+        if not questions:
+            questions = self.survey.get_random_questions(
+                count=questions_count, 
+                user_work_domain=None,  # Remove work domain filter
+                user_employee_level=self.user.employee_level
+            )
+        
+        # If still no questions, try with just basic questions
+        if not questions:
+            questions = self.survey.questions.filter(is_active=True)[:questions_count or 30]
+        
         for i, question in enumerate(questions, 1):
             SessionQuestion.objects.create(
                 session=self,
