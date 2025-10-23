@@ -675,6 +675,41 @@ class SessionRecording(models.Model):
         return f"Recording for {self.session}"
 
 
+class VideoChunk(models.Model):
+    """Model for storing video chunks during session recording."""
+    
+    session = models.ForeignKey(SurveySession, on_delete=models.CASCADE, related_name='video_chunks')
+    chunk_number = models.PositiveIntegerField(_("Chunk Number"), help_text=_("Sequential chunk number"))
+    chunk_file = models.FileField(_("Chunk File"), upload_to='video_chunks/%Y/%m/%d/')
+    file_size = models.BigIntegerField(_("File Size"), help_text=_("Size in bytes"))
+    duration_seconds = models.FloatField(_("Duration"), help_text=_("Duration in seconds"))
+    
+    # Timestamps
+    start_time = models.FloatField(_("Start Time"), help_text=_("Start time in seconds from session start"))
+    end_time = models.FloatField(_("End Time"), help_text=_("End time in seconds from session start"))
+    
+    # Metadata
+    uploaded_at = models.DateTimeField(_("Uploaded At"), auto_now_add=True)
+    processed = models.BooleanField(_("Processed"), default=False)
+    
+    # Quality metrics
+    has_audio = models.BooleanField(_("Has Audio"), default=True)
+    resolution = models.CharField(_("Resolution"), max_length=20, blank=True, help_text=_("e.g., 1280x720"))
+    fps = models.IntegerField(_("FPS"), null=True, blank=True)
+    
+    class Meta:
+        verbose_name = _("Video Chunk")
+        verbose_name_plural = _("Video Chunks")
+        ordering = ['session', 'chunk_number']
+        unique_together = ['session', 'chunk_number']
+        indexes = [
+            models.Index(fields=['session', 'chunk_number']),
+        ]
+    
+    def __str__(self):
+        return f"Chunk {self.chunk_number} for {self.session}"
+
+
 class ProctorReview(models.Model):
     """Model for moderator review of flagged sessions."""
     

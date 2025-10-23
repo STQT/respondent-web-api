@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 from apps.surveys.models import (
     Survey, Question, Choice, SurveySession, 
     SessionQuestion, Answer, UserSurveyHistory,
-    FaceVerification, SessionRecording, ProctorReview
+    FaceVerification, SessionRecording, ProctorReview, VideoChunk
 )
 
 
@@ -517,5 +517,20 @@ class SessionRecordingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'session_id', 'video_file', 'file_size', 'duration_seconds',
             'uploaded_at', 'processed', 'total_violations', 'violation_summary'
+        ]
+        read_only_fields = ['id', 'uploaded_at', 'session_id']
+
+
+class VideoChunkSerializer(serializers.ModelSerializer):
+    """Serializer for video chunks."""
+    
+    session_id = serializers.UUIDField(source='session.id', read_only=True)
+    
+    class Meta:
+        model = VideoChunk
+        fields = [
+            'id', 'session_id', 'chunk_number', 'chunk_file', 'file_size', 
+            'duration_seconds', 'start_time', 'end_time', 'uploaded_at', 
+            'processed', 'has_audio', 'resolution', 'fps'
         ]
         read_only_fields = ['id', 'uploaded_at', 'session_id']

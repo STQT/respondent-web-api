@@ -18,13 +18,13 @@ from drf_spectacular.types import OpenApiTypes
 
 from apps.surveys.models import (
     Survey, SurveySession, SessionQuestion, Answer, UserSurveyHistory,
-    FaceVerification, SessionRecording, ProctorReview
+    FaceVerification, SessionRecording, ProctorReview, VideoChunk
 )
 from .serializers import (
     SurveyListSerializer, SurveyDetailSerializer, StartSurveySerializer,
     SurveySessionSerializer, SubmitAnswerSerializer, AnswerSerializer,
     UserSurveyHistorySerializer, SessionQuestionSerializer, CertificateDataSerializer,
-    FaceVerificationSerializer, SessionRecordingSerializer, ProctorReviewSerializer
+    FaceVerificationSerializer, SessionRecordingSerializer, ProctorReviewSerializer, VideoChunkSerializer
 )
 
 
@@ -1889,3 +1889,207 @@ class ProctorViewSet(GenericViewSet):
             'recording_id': recording.id,
             'status': 'uploaded'
         })
+    
+    @extend_schema(
+        summary="Upload video chunk",
+        description="Upload a video chunk during session recording.",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "format": "uuid"},
+                    "chunk_number": {"type": "integer"},
+                    "video_chunk": {"type": "string", "format": "binary"},
+                    "duration_seconds": {"type": "number"},
+                    "start_time": {"type": "number"},
+                    "end_time": {"type": "number"},
+                    "has_audio": {"type": "boolean"},
+                    "resolution": {"type": "string"},
+                    "fps": {"type": "integer"}
+                },
+                "required": ["session_id", "chunk_number", "video_chunk", "duration_seconds", "start_time", "end_time"]
+            }
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "chunk_id": {"type": "integer"},
+                    "status": {"type": "string", "example": "uploaded"},
+                    "total_chunks": {"type": "integer"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='upload-chunk')
+    def upload_chunk(self, request):
+        """Upload a video chunk during session recording."""
+        session_id = request.data.get('session_id')
+        chunk_number = request.data.get('chunk_number')
+        video_chunk = request.FILES.get('video_chunk')
+        duration_seconds = request.data.get('duration_seconds')
+        start_time = request.data.get('start_time')
+        end_time = request.data.get('end_time')
+        
+        if not all([session_id, chunk_number, video_chunk, duration_seconds, start_time, end_time]):
+            return Response(
+                {'error': 'session_id, chunk_number, video_chunk, duration_seconds, start_time, end_time are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        
+        chunk = VideoChunk.objects.create(
+            session=session,
+            chunk_number=int(chunk_number),
+            chunk_file=video_chunk,
+            file_size=video_chunk.size,
+            duration_seconds=float(duration_seconds),
+            start_time=float(start_time),
+            end_time=float(end_time),
+            has_audio=request.data.get('has_audio', True),
+            resolution=request.data.get('resolution', ''),
+            fps=int(request.data.get('fps')) if request.data.get('fps') else None
+        )
+        
+        total_chunks = session.video_chunks.count()
+        
+        return Response({
+            'chunk_id': chunk.id,
+            'status': 'uploaded',
+            'total_chunks': total_chunks
+        })
+    
+    @extend_schema(
+        summary="Get video chunks",
+        description="Get all video chunks for a session.",
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "format": "uuid"},
+                    "total_chunks": {"type": "integer"},
+                    "total_duration": {"type": "number"},
+                    "chunks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "chunk_number": {"type": "integer"},
+                                "duration_seconds": {"type": "number"},
+                                "file_size": {"type": "integer"},
+                                "start_time": {"type": "number"},
+                                "end_time": {"type": "number"},
+                                "uploaded_at": {"type": "string", "format": "date-time"}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='session/(?P<session_id>[^/.]+)/chunks')
+    def get_video_chunks(self, request, session_id=None):
+        """Get all video chunks for a session."""
+        session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        chunks = session.video_chunks.all().order_by('chunk_number')
+        
+        total_duration = sum(chunk.duration_seconds for chunk in chunks)
+        
+        chunks_data = [{
+            'chunk_number': chunk.chunk_number,
+            'duration_seconds': chunk.duration_seconds,
+            'file_size': chunk.file_size,
+            'start_time': chunk.start_time,
+            'end_time': chunk.end_time,
+            'uploaded_at': chunk.uploaded_at,
+            'has_audio': chunk.has_audio,
+            'resolution': chunk.resolution,
+            'fps': chunk.fps
+        } for chunk in chunks]
+        
+        return Response({
+            'session_id': str(session.id),
+            'total_chunks': chunks.count(),
+            'total_duration': total_duration,
+            'chunks': chunks_data
+        })
+    
+    @extend_schema(
+        summary="Merge video chunks",
+        description="Merge all video chunks into a single recording file.",
+        request={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "format": "uuid"}
+            },
+            "required": ["session_id"]
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "processing"},
+                    "message": {"type": "string", "example": "Video chunks are being merged"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='merge-chunks')
+    def merge_chunks(self, request):
+        """Merge all video chunks into a single recording file."""
+        session_id = request.data.get('session_id')
+        
+        if not session_id:
+            return Response(
+                {'error': 'session_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        
+        chunks = session.video_chunks.all().order_by('chunk_number')
+        
+        if not chunks.exists():
+            return Response(
+                {'error': 'No video chunks found for this session'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Calculate total duration and file size
+        total_duration = sum(chunk.duration_seconds for chunk in chunks)
+        total_file_size = sum(chunk.file_size for chunk in chunks)
+        
+        # Create SessionRecording record
+        # Note: In production, you would use a background task (Celery) to merge chunks
+        recording, created = SessionRecording.objects.get_or_create(
+            session=session,
+            defaults={
+                'file_size': total_file_size,
+                'duration_seconds': int(total_duration),
+                'total_violations': session.violations_count,
+                'violation_summary': {
+                    'total_chunks': chunks.count(),
+                    'merged_at': timezone.now().isoformat(),
+                    'chunk_sizes': [chunk.file_size for chunk in chunks]
+                }
+            }
+        )
+        
+        if created:
+            # Mark chunks as processed
+            chunks.update(processed=True)
+            
+            return Response({
+                'status': 'merged',
+                'recording_id': recording.id,
+                'total_duration': total_duration,
+                'total_chunks': chunks.count(),
+                'message': 'Video chunks merged successfully'
+            })
+        else:
+            return Response({
+                'status': 'already_exists',
+                'recording_id': recording.id,
+                'message': 'Recording already exists for this session'
+            })
