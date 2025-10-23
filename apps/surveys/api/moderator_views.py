@@ -13,7 +13,7 @@ from drf_spectacular.utils import (
 from drf_spectacular.types import OpenApiTypes
 
 from apps.users.models import User
-from apps.surveys.models import Survey, SurveySession, UserSurveyHistory
+from apps.surveys.models import Survey, SurveySession, UserSurveyHistory, FaceVerification, ProctorReview
 from apps.surveys.permissions import IsModeratorPermission, IsSuperUserOrModeratorPermission
 from .moderator_serializers import (
     ModeratorUserListSerializer,
@@ -594,6 +594,159 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
         }
         
         return Response(session_data)
+    
+    @extend_schema(
+        summary="Сессии с нарушениями",
+        description="Получить список сессий, помеченных для проверки из-за нарушений прокторинга.",
+        tags=["Модераторы"],
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "session_id": {"type": "string", "format": "uuid"},
+                        "user": {"type": "object"},
+                        "survey": {"type": "object"},
+                        "violations_count": {"type": "integer"},
+                        "started_at": {"type": "string", "format": "date-time"},
+                        "has_recording": {"type": "boolean"},
+                        "review_status": {"type": "string"}
+                    }
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='flagged-sessions')
+    def flagged_sessions(self, request):
+        """Get sessions flagged for review."""
+        sessions = SurveySession.objects.filter(
+            flagged_for_review=True
+        ).select_related('user', 'survey').prefetch_related('face_verifications')
+        
+        data = []
+        for session in sessions:
+            data.append({
+                'session_id': str(session.id),
+                'user': {'id': session.user.id, 'name': session.user.name},
+                'survey': {'id': session.survey.id, 'title': session.survey.title},
+                'violations_count': session.violations_count,
+                'started_at': session.started_at,
+                'completed_at': session.completed_at,
+                'has_recording': hasattr(session, 'recording'),
+                'review_status': session.proctor_review.status if hasattr(session, 'proctor_review') else 'pending'
+            })
+        
+        return Response(data)
+    
+    @extend_schema(
+        summary="Нарушения сессии",
+        description="Получить все нарушения для конкретной сессии.",
+        tags=["Модераторы"],
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "timestamp": {"type": "string", "format": "date-time"},
+                        "violation_type": {"type": "string"},
+                        "face_count": {"type": "integer"},
+                        "snapshot_url": {"type": "string", "nullable": True}
+                    }
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='session/(?P<session_id>[^/.]+)/violations')
+    def session_violations(self, request, session_id=None):
+        """Get all violations for a session."""
+        session = get_object_or_404(SurveySession, id=session_id)
+        violations = session.face_verifications.filter(is_violation=True)
+        
+        data = [{
+            'id': v.id,
+            'timestamp': v.timestamp,
+            'violation_type': v.violation_type,
+            'face_count': v.face_count,
+            'face_detected': v.face_detected,
+            'confidence_score': v.confidence_score,
+            'looking_at_screen': v.looking_at_screen,
+            'mobile_device_detected': v.mobile_device_detected,
+            'snapshot_url': v.snapshot.url if v.snapshot else None
+        } for v in violations]
+        
+        return Response(data)
+    
+    @extend_schema(
+        summary="Проверить сессию",
+        description="Модератор проверяет и выносит решение по сессии с нарушениями.",
+        tags=["Модераторы"],
+        request={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "format": "uuid"},
+                "status": {"type": "string", "enum": ["approved", "rejected", "flagged"]},
+                "notes": {"type": "string"}
+            },
+            "required": ["session_id", "status"]
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "reviewed"},
+                    "review_status": {"type": "string"},
+                    "session_updated": {"type": "boolean"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='review-session')
+    def review_session(self, request):
+        """Moderator review of a session."""
+        session_id = request.data.get('session_id')
+        review_status = request.data.get('status')
+        notes = request.data.get('notes', '')
+        
+        if not session_id or not review_status:
+            return Response(
+                {'error': 'session_id and status are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session = get_object_or_404(SurveySession, id=session_id)
+        
+        from django.utils import timezone
+        review, created = ProctorReview.objects.get_or_create(
+            session=session,
+            defaults={'reviewer': request.user}
+        )
+        
+        review.status = review_status
+        review.notes = notes
+        review.reviewed_at = timezone.now()
+        review.reviewer = request.user
+        review.save()
+        
+        # If rejected - invalidate results
+        session_updated = False
+        if review_status == 'rejected':
+            session.is_passed = False
+            session.flagged_for_review = False
+            session.save()
+            session_updated = True
+        elif review_status == 'approved':
+            session.flagged_for_review = False
+            session.save()
+            session_updated = True
+        
+        return Response({
+            'status': 'reviewed',
+            'review_status': review_status,
+            'session_updated': session_updated
+        })
 
 
 @extend_schema_view(

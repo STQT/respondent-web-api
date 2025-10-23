@@ -3,7 +3,8 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 from apps.surveys.models import (
     Survey, Question, Choice, SurveySession, 
-    SessionQuestion, Answer, UserSurveyHistory
+    SessionQuestion, Answer, UserSurveyHistory,
+    FaceVerification, SessionRecording, ProctorReview
 )
 
 
@@ -476,3 +477,45 @@ class CertificateDataSerializer(serializers.ModelSerializer):
     def get_duration_minutes(self, obj):
         """Calculate duration in minutes."""
         return obj.duration_minutes()
+
+
+class FaceVerificationSerializer(serializers.ModelSerializer):
+    """Serializer for face verification records."""
+    
+    class Meta:
+        model = FaceVerification
+        fields = [
+            'id', 'timestamp', 'face_detected', 'face_count', 
+            'confidence_score', 'looking_at_screen', 'mobile_device_detected',
+            'is_violation', 'violation_type', 'snapshot'
+        ]
+        read_only_fields = ['id', 'timestamp']
+
+
+class ProctorReviewSerializer(serializers.ModelSerializer):
+    """Serializer for proctor review records."""
+    
+    reviewer_name = serializers.CharField(source='reviewer.name', read_only=True)
+    session_id = serializers.UUIDField(source='session.id', read_only=True)
+    
+    class Meta:
+        model = ProctorReview
+        fields = [
+            'id', 'session_id', 'status', 'reviewed_at', 'reviewer_name', 
+            'notes', 'auto_flagged', 'flag_reason'
+        ]
+        read_only_fields = ['id', 'reviewed_at', 'reviewer_name', 'session_id']
+
+
+class SessionRecordingSerializer(serializers.ModelSerializer):
+    """Serializer for session video recordings."""
+    
+    session_id = serializers.UUIDField(source='session.id', read_only=True)
+    
+    class Meta:
+        model = SessionRecording
+        fields = [
+            'id', 'session_id', 'video_file', 'file_size', 'duration_seconds',
+            'uploaded_at', 'processed', 'total_violations', 'violation_summary'
+        ]
+        read_only_fields = ['id', 'uploaded_at', 'session_id']

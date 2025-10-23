@@ -21,7 +21,8 @@ from apps.surveys.api.views import (
     SurveySessionViewSet,
     CurrentSessionView,
     DownloadUserCertificatePDFView,
-    GetUserCertificateDataView
+    GetUserCertificateDataView,
+    ProctorViewSet
 )
 from apps.surveys.api.moderator_views import (
     ModeratorUserViewSet,
@@ -34,6 +35,7 @@ router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 router.register("users", UserViewSet)
 router.register("surveys", SurveyViewSet, basename='survey')
 router.register("sessions", SurveySessionViewSet, basename='surveysession')
+router.register("proctor", ProctorViewSet, basename='proctor')
 
 # Moderator endpoints
 router.register("moderator/users", ModeratorUserViewSet, basename='moderator-user')

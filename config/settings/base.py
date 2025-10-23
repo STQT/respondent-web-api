@@ -171,6 +171,14 @@ MEDIA_ROOT = str(APPS_DIR / "media")
 # https://docs.djangoproject.com/en/dev/ref/settings/#media-url
 MEDIA_URL = "/media/"
 
+# PROCTORING
+# ------------------------------------------------------------------------------
+# Face monitoring and proctoring settings
+PROCTORING_ENABLED = env.bool('PROCTORING_ENABLED', default=True)
+PROCTORING_HEARTBEAT_INTERVAL = 5  # seconds between face verification checks
+PROCTORING_VIOLATION_THRESHOLD = 3  # auto-flag session after N violations
+PROCTORING_MIN_CONFIDENCE = 0.6  # minimum face detection confidence score (0-1)
+
 # TEMPLATES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#templates

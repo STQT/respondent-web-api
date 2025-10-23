@@ -17,12 +17,14 @@ from drf_spectacular.utils import (
 from drf_spectacular.types import OpenApiTypes
 
 from apps.surveys.models import (
-    Survey, SurveySession, SessionQuestion, Answer, UserSurveyHistory
+    Survey, SurveySession, SessionQuestion, Answer, UserSurveyHistory,
+    FaceVerification, SessionRecording, ProctorReview
 )
 from .serializers import (
     SurveyListSerializer, SurveyDetailSerializer, StartSurveySerializer,
     SurveySessionSerializer, SubmitAnswerSerializer, AnswerSerializer,
-    UserSurveyHistorySerializer, SessionQuestionSerializer, CertificateDataSerializer
+    UserSurveyHistorySerializer, SessionQuestionSerializer, CertificateDataSerializer,
+    FaceVerificationSerializer, SessionRecordingSerializer, ProctorReviewSerializer
 )
 
 
@@ -1661,3 +1663,229 @@ class DownloadUserCertificatePDFView(View):
                 content_type="application/json", 
                 status=500
             )
+
+
+@extend_schema_view(
+    tags=["Proctoring"]
+)
+class ProctorViewSet(GenericViewSet):
+    """ViewSet for proctoring functionality."""
+    
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        summary="Verify initial face",
+        description="Verify and store user's face at the start of survey session.",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "format": "uuid"},
+                    "face_image": {"type": "string", "format": "binary"}
+                },
+                "required": ["session_id", "face_image"]
+            }
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "verified"},
+                    "session_id": {"type": "string", "format": "uuid"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='verify-initial')
+    def verify_initial_face(self, request):
+        """Verify face at the start of session."""
+        session_id = request.data.get('session_id')
+        face_image = request.FILES.get('face_image')
+        
+        if not session_id or not face_image:
+            return Response(
+                {'error': 'session_id and face_image are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        
+        # Save reference image
+        session.face_reference_image = face_image
+        session.initial_face_verified = True
+        session.save()
+        
+        return Response({
+            'status': 'verified',
+            'session_id': str(session.id)
+        })
+    
+    @extend_schema(
+        summary="Record violation",
+        description="Record a proctoring violation during survey session.",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "format": "uuid"},
+                    "violation_type": {"type": "string", "example": "no_face"},
+                    "snapshot": {"type": "string", "format": "binary"},
+                    "face_count": {"type": "integer"},
+                    "confidence_score": {"type": "number"}
+                },
+                "required": ["session_id", "violation_type"]
+            }
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "violation_id": {"type": "integer"},
+                    "total_violations": {"type": "integer"},
+                    "flagged_for_review": {"type": "boolean"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='record-violation')
+    def record_violation(self, request):
+        """Record a proctoring violation."""
+        session_id = request.data.get('session_id')
+        violation_type = request.data.get('violation_type')
+        snapshot = request.FILES.get('snapshot')
+        
+        if not session_id or not violation_type:
+            return Response(
+                {'error': 'session_id and violation_type are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        
+        # Prepare metadata
+        metadata = {
+            'face_detected': request.data.get('face_detected', False),
+            'face_count': int(request.data.get('face_count', 0)),
+            'confidence_score': float(request.data.get('confidence_score')) if request.data.get('confidence_score') else None,
+            'looking_at_screen': request.data.get('looking_at_screen', True),
+            'mobile_device_detected': request.data.get('mobile_detected', False)
+        }
+        
+        violation = session.record_violation(
+            violation_type=violation_type,
+            snapshot=snapshot,
+            metadata=metadata
+        )
+        
+        return Response({
+            'violation_id': violation.id,
+            'total_violations': session.violations_count,
+            'flagged_for_review': session.flagged_for_review
+        })
+    
+    @extend_schema(
+        summary="Proctoring heartbeat",
+        description="Regular heartbeat with face verification status (every 5 seconds).",
+        request={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "format": "uuid"},
+                "face_data": {
+                    "type": "object",
+                    "properties": {
+                        "face_detected": {"type": "boolean"},
+                        "face_count": {"type": "integer"},
+                        "confidence": {"type": "number"},
+                        "looking_at_screen": {"type": "boolean"},
+                        "mobile_detected": {"type": "boolean"}
+                    }
+                }
+            },
+            "required": ["session_id", "face_data"]
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "ok"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='heartbeat')
+    def proctoring_heartbeat(self, request):
+        """Regular heartbeat with face verification status."""
+        session_id = request.data.get('session_id')
+        face_data = request.data.get('face_data', {})
+        
+        if not session_id:
+            return Response(
+                {'error': 'session_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        
+        # Create verification record
+        FaceVerification.objects.create(
+            session=session,
+            face_detected=face_data.get('face_detected', False),
+            face_count=face_data.get('face_count', 0),
+            confidence_score=face_data.get('confidence'),
+            looking_at_screen=face_data.get('looking_at_screen', True),
+            mobile_device_detected=face_data.get('mobile_detected', False)
+        )
+        
+        return Response({'status': 'ok'})
+    
+    @extend_schema(
+        summary="Upload recording",
+        description="Upload full session video recording.",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "format": "uuid"},
+                    "video": {"type": "string", "format": "binary"},
+                    "duration_seconds": {"type": "integer"}
+                },
+                "required": ["session_id", "video", "duration_seconds"]
+            }
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "recording_id": {"type": "integer"},
+                    "status": {"type": "string", "example": "uploaded"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='upload-recording')
+    def upload_recording(self, request):
+        """Upload full session recording."""
+        session_id = request.data.get('session_id')
+        video_file = request.FILES.get('video')
+        duration = request.data.get('duration_seconds')
+        
+        if not session_id or not video_file or not duration:
+            return Response(
+                {'error': 'session_id, video, and duration_seconds are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        
+        recording = SessionRecording.objects.create(
+            session=session,
+            video_file=video_file,
+            file_size=video_file.size,
+            duration_seconds=int(duration),
+            total_violations=session.violations_count
+        )
+        
+        return Response({
+            'recording_id': recording.id,
+            'status': 'uploaded'
+        })

@@ -318,6 +318,13 @@ class SurveySession(models.Model):
     # Language used in this session
     language = models.CharField(_("Language"), max_length=10, default='uz')
     
+    # Proctoring fields
+    proctoring_enabled = models.BooleanField(_("Proctoring Enabled"), default=True, help_text=_("Face monitoring enabled for this session"))
+    initial_face_verified = models.BooleanField(_("Initial Face Verified"), default=False, help_text=_("Initial face verification completed"))
+    face_reference_image = models.ImageField(_("Face Reference Image"), upload_to='face_references/%Y/%m/%d/', null=True, blank=True)
+    violations_count = models.IntegerField(_("Violations Count"), default=0)
+    flagged_for_review = models.BooleanField(_("Flagged for Review"), default=False)
+    
     # Moderator approval
     can_retake = models.BooleanField(_("Can Retake"), default=False, help_text=_("Moderator granted permission for retake"))
     retake_reason = models.TextField(_("Retake Reason"), blank=True, help_text=_("Reason for granting retake permission"))
@@ -478,6 +485,27 @@ class SurveySession(models.Model):
             }
         return None
     
+    def record_violation(self, violation_type, snapshot=None, metadata=None):
+        """Record a proctoring violation."""
+        if metadata is None:
+            metadata = {}
+        
+        self.violations_count += 1
+        if self.violations_count >= 3:  # Threshold for automatic flagging
+            self.flagged_for_review = True
+        self.save()
+        
+        # Create violation record
+        from apps.surveys.models import FaceVerification
+        verification = FaceVerification.objects.create(
+            session=self,
+            is_violation=True,
+            violation_type=violation_type,
+            snapshot=snapshot,
+            **metadata
+        )
+        return verification
+    
     def __str__(self):
         return f"{self.user.name} - {self.survey.title} (Attempt {self.attempt_number})"
 
@@ -584,3 +612,102 @@ class UserSurveyHistory(models.Model):
     
     def __str__(self):
         return f"{self.user.name} - {self.survey.title} History"
+
+
+class FaceVerification(models.Model):
+    """Model for storing face verifications during survey sessions."""
+    
+    session = models.ForeignKey(SurveySession, on_delete=models.CASCADE, related_name='face_verifications')
+    timestamp = models.DateTimeField(_("Timestamp"), auto_now_add=True)
+    
+    # Verification results
+    face_detected = models.BooleanField(_("Face Detected"), default=False)
+    face_count = models.IntegerField(_("Face Count"), default=0, help_text=_("Number of detected faces"))
+    confidence_score = models.FloatField(_("Confidence Score"), null=True, blank=True, help_text=_("Detection confidence 0-1"))
+    
+    # Additional checks
+    looking_at_screen = models.BooleanField(_("Looking at Screen"), default=True, help_text=_("Gaze direction check"))
+    mobile_device_detected = models.BooleanField(_("Mobile Device Detected"), default=False, help_text=_("Mobile phone in frame"))
+    
+    # Saved image (only for violations)
+    snapshot = models.ImageField(_("Snapshot"), upload_to='face_verifications/%Y/%m/%d/', null=True, blank=True)
+    
+    # Violation status
+    is_violation = models.BooleanField(_("Is Violation"), default=False)
+    violation_type = models.CharField(_("Violation Type"), max_length=50, blank=True, help_text=_("e.g., 'no_face', 'multiple_faces', 'mobile_detected'"))
+    
+    class Meta:
+        verbose_name = _("Face Verification")
+        verbose_name_plural = _("Face Verifications")
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['session', '-timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.session} - {self.timestamp} ({'Violation' if self.is_violation else 'OK'})"
+
+
+class SessionRecording(models.Model):
+    """Model for storing full video recordings of survey sessions."""
+    
+    session = models.OneToOneField(SurveySession, on_delete=models.CASCADE, related_name='recording')
+    
+    # Video file
+    video_file = models.FileField(_("Video File"), upload_to='session_recordings/%Y/%m/%d/')
+    file_size = models.BigIntegerField(_("File Size"), help_text=_("Size in bytes"))
+    duration_seconds = models.IntegerField(_("Duration"), help_text=_("Duration in seconds"))
+    
+    # Metadata
+    uploaded_at = models.DateTimeField(_("Uploaded At"), auto_now_add=True)
+    processed = models.BooleanField(_("Processed"), default=False)
+    
+    # Violation statistics
+    total_violations = models.IntegerField(_("Total Violations"), default=0)
+    violation_summary = models.JSONField(_("Violation Summary"), default=dict, blank=True)
+    
+    class Meta:
+        verbose_name = _("Session Recording")
+        verbose_name_plural = _("Session Recordings")
+        ordering = ['-uploaded_at']
+    
+    def __str__(self):
+        return f"Recording for {self.session}"
+
+
+class ProctorReview(models.Model):
+    """Model for moderator review of flagged sessions."""
+    
+    REVIEW_STATUS_CHOICES = [
+        ('pending', _('Pending Review')),
+        ('approved', _('Approved')),
+        ('rejected', _('Rejected')),
+        ('flagged', _('Flagged for Additional Review')),
+    ]
+    
+    session = models.OneToOneField(SurveySession, on_delete=models.CASCADE, related_name='proctor_review')
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='reviewed_sessions',
+        verbose_name=_("Reviewer")
+    )
+    
+    status = models.CharField(_("Status"), max_length=20, choices=REVIEW_STATUS_CHOICES, default='pending')
+    reviewed_at = models.DateTimeField(_("Reviewed At"), null=True, blank=True)
+    
+    # Moderator comments
+    notes = models.TextField(_("Notes"), blank=True)
+    
+    # Auto-flagging
+    auto_flagged = models.BooleanField(_("Auto Flagged"), default=False)
+    flag_reason = models.TextField(_("Flag Reason"), blank=True)
+    
+    class Meta:
+        verbose_name = _("Proctor Review")
+        verbose_name_plural = _("Proctor Reviews")
+        ordering = ['-session__started_at']
+    
+    def __str__(self):
+        return f"Review for {self.session} - {self.get_status_display()}"
