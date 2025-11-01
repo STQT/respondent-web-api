@@ -674,7 +674,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
             'confidence_score': v.confidence_score,
             'looking_at_screen': v.looking_at_screen,
             'mobile_device_detected': v.mobile_device_detected,
-            'snapshot_url': v.snapshot.url if v.snapshot else None
+            'snapshot_url': request.build_absolute_uri(v.snapshot.url) if v.snapshot else None
         } for v in violations]
         
         return Response(data)
@@ -812,7 +812,7 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
         for chunk in chunks:
             chunks_data.append({
                 'chunk_number': chunk.chunk_number,
-                'video_url': chunk.chunk_file.url,
+                'video_url': request.build_absolute_uri(chunk.chunk_file.url) if chunk.chunk_file else None,
                 'duration_seconds': chunk.duration_seconds,
                 'start_time': chunk.start_time,
                 'end_time': chunk.end_time,
@@ -824,8 +824,8 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
             })
         
         recording_data = {
-            'playlist_url': recording.playlist_file.url if recording.playlist_file else None,
-            'video_file_url': recording.video_file.url if recording.video_file else None,
+            'playlist_url': request.build_absolute_uri(recording.playlist_file.url) if recording.playlist_file else None,
+            'video_file_url': request.build_absolute_uri(recording.video_file.url) if recording.video_file else None,
             'duration_seconds': recording.duration_seconds,
             'file_size': recording.file_size,
             'processed': recording.processed,
