@@ -438,5 +438,9 @@ OTP_LENGTH = 6
 C1_BASE_URL = env("C1_BASE_URL", default="http://195.158.24.168:8080/hgt_test/hs/kpi-data-provider")
 C1_BASIC_TOKEN = env("C1_BASIC_TOKEN", default="")
 
+# Base URL for generating absolute URLs in background tasks (e.g., M3U8 playlists)
+# ------------------------------------------------------------------------------
+BASE_URL = env("BASE_URL", default="http://localhost:8000")
+
 # Your stuff...
 # ------------------------------------------------------------------------------

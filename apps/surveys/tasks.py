@@ -40,8 +40,14 @@ def create_hls_playlist(session_id):
     # Add each chunk to the playlist
     total_duration = 0
     for chunk in chunks:
-        # Get the chunk file URL
+        # Get the chunk file URL - build absolute URL for M3U8 playlist
         chunk_url = chunk.chunk_file.url
+        # Make absolute URL if it's relative
+        if chunk_url.startswith('/'):
+            base_url = getattr(settings, 'BASE_URL', 'http://localhost:8000')
+            # Remove trailing slash from BASE_URL if present
+            base_url = base_url.rstrip('/')
+            chunk_url = f'{base_url}{chunk_url}'
         
         # Add segment info
         playlist_lines.append(f'#EXTINF:{chunk.duration_seconds:.3f},')

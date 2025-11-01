@@ -180,5 +180,10 @@ sentry_sdk.init(
 SPECTACULAR_SETTINGS["SERVERS"] = [
     {"url": "https://api.savollar.leetcode.uz", "description": "Production server"},
 ]
+
+# Base URL for generating absolute URLs in background tasks
+# ------------------------------------------------------------------------------
+BASE_URL = env("BASE_URL", default="https://api.savollar.leetcode.uz")
+
 # Your stuff...
 # ------------------------------------------------------------------------------
