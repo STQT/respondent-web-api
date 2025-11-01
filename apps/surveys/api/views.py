@@ -1972,7 +1972,7 @@ class ProctorViewSet(GenericViewSet):
     
     @extend_schema(
         summary="Upload video chunk",
-        description="Upload a video chunk during session recording.",
+        description="Upload a video chunk during session recording. If a chunk with the same session_id and chunk_number already exists, it will be updated.",
         request={
             "multipart/form-data": {
                 "type": "object",
@@ -1995,7 +1995,7 @@ class ProctorViewSet(GenericViewSet):
                 "type": "object",
                 "properties": {
                     "chunk_id": {"type": "integer"},
-                    "status": {"type": "string", "example": "uploaded"},
+                    "status": {"type": "string", "example": "uploaded or updated"},
                     "total_chunks": {"type": "integer"}
                 }
             }
@@ -2003,7 +2003,7 @@ class ProctorViewSet(GenericViewSet):
     )
     @action(detail=False, methods=['post'], url_path='upload-chunk')
     def upload_chunk(self, request):
-        """Upload a video chunk during session recording."""
+        """Upload or update a video chunk during session recording."""
         session_id = request.data.get('session_id')
         chunk_number = request.data.get('chunk_number')
         video_chunk = request.FILES.get('video_chunk')
@@ -2022,24 +2022,30 @@ class ProctorViewSet(GenericViewSet):
         # Add proper file extension if missing
         video_chunk = add_file_extension(video_chunk)
         
-        chunk = VideoChunk.objects.create(
+        chunk_number_int = int(chunk_number)
+        
+        # Check if chunk already exists and update it if needed
+        chunk, created = VideoChunk.objects.update_or_create(
             session=session,
-            chunk_number=int(chunk_number),
-            chunk_file=video_chunk,
-            file_size=video_chunk.size,
-            duration_seconds=float(duration_seconds),
-            start_time=float(start_time),
-            end_time=float(end_time),
-            has_audio=to_boolean(request.data.get('has_audio', True), True),
-            resolution=request.data.get('resolution', ''),
-            fps=int(request.data.get('fps')) if request.data.get('fps') else None
+            chunk_number=chunk_number_int,
+            defaults={
+                'chunk_file': video_chunk,
+                'file_size': video_chunk.size,
+                'duration_seconds': float(duration_seconds),
+                'start_time': float(start_time),
+                'end_time': float(end_time),
+                'has_audio': to_boolean(request.data.get('has_audio', True), True),
+                'resolution': request.data.get('resolution', ''),
+                'fps': int(request.data.get('fps')) if request.data.get('fps') else None,
+                'processed': False  # Reset processed status when chunk is updated
+            }
         )
         
         total_chunks = session.video_chunks.count()
         
         return Response({
             'chunk_id': chunk.id,
-            'status': 'uploaded',
+            'status': 'uploaded' if created else 'updated',
             'total_chunks': total_chunks
         })
     
