@@ -15,6 +15,7 @@ from apps.users.api.views import (
     GTFStaffListView,
     RegisterView,
     PasswordLoginView,
+    GetEmployeeFrom1CView,
 )
 from apps.surveys.api.views import (
     SurveyViewSet,
@@ -63,6 +64,9 @@ urlpatterns = [
     path("positions/", PositionListView.as_view(), name="positions-list"),
     path("gtf/", GTFStaffListView.as_view(), name="gtf-list"),
     path("certificate/", include("apps.surveys.urls", namespace="surveys")),
+    
+    # 1C integration endpoints
+    path("1c/get-employee/", GetEmployeeFrom1CView.as_view(), name="1c-get-employee"),
     
     # Include router URLs
     path("", include(router.urls)),

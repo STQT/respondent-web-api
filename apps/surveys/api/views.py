@@ -22,6 +22,7 @@ from apps.surveys.models import (
     Survey, SurveySession, SessionQuestion, Answer, UserSurveyHistory,
     FaceVerification, SessionRecording, ProctorReview, VideoChunk
 )
+from apps.surveys.tasks import create_hls_playlist
 from .serializers import (
     SurveyListSerializer, SurveyDetailSerializer, StartSurveySerializer,
     SurveySessionSerializer, SubmitAnswerSerializer, AnswerSerializer,
@@ -533,6 +534,10 @@ class SurveySessionViewSet(GenericViewSet):
                     # Calculate final score
                     final_score = session.calculate_final_score()
                     
+                    # Start Celery task to create HLS playlist if proctoring was enabled
+                    if session.proctoring_enabled:
+                        create_hls_playlist.delay(str(session.id))
+                    
                     # Update user history
                     try:
                         history = UserSurveyHistory.objects.get(user=request.user, survey=session.survey)
@@ -683,6 +688,10 @@ class SurveySessionViewSet(GenericViewSet):
             
             # Calculate final score based on answered questions
             final_score = session.calculate_final_score()
+            
+            # Start Celery task to create HLS playlist if proctoring was enabled
+            if session.proctoring_enabled:
+                create_hls_playlist.delay(str(session.id))
             
             # Get completion statistics
             total_questions = session.sessionquestion_set.count()

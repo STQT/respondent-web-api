@@ -515,7 +515,7 @@ class SessionRecordingSerializer(serializers.ModelSerializer):
     class Meta:
         model = SessionRecording
         fields = [
-            'id', 'session_id', 'video_file', 'file_size', 'duration_seconds',
+            'id', 'session_id', 'video_file', 'playlist_file', 'file_size', 'duration_seconds',
             'uploaded_at', 'processed', 'total_violations', 'violation_summary'
         ]
         read_only_fields = ['id', 'uploaded_at', 'session_id']

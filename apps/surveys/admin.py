@@ -202,7 +202,7 @@ class SessionRecordingAdmin(admin.ModelAdmin):
     
     fieldsets = (
         (_('Recording'), {
-            'fields': ('session', 'video_file', 'file_size', 'duration_seconds')
+            'fields': ('session', 'video_file', 'playlist_file', 'file_size', 'duration_seconds')
         }),
         (_('Processing'), {
             'fields': ('uploaded_at', 'processed')

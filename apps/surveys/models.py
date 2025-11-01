@@ -654,7 +654,8 @@ class SessionRecording(models.Model):
     session = models.OneToOneField(SurveySession, on_delete=models.CASCADE, related_name='recording')
     
     # Video file
-    video_file = models.FileField(_("Video File"), upload_to='session_recordings/%Y/%m/%d/')
+    video_file = models.FileField(_("Video File"), upload_to='session_recordings/%Y/%m/%d/', null=True, blank=True, help_text=_("Full merged video file (optional, use playlist_file for HLS)"))
+    playlist_file = models.FileField(_("HLS Playlist File"), upload_to='session_recordings/playlists/%Y/%m/%d/', null=True, blank=True, help_text=_("M3U8 HLS playlist for video chunks"))
     file_size = models.BigIntegerField(_("File Size"), help_text=_("Size in bytes"))
     duration_seconds = models.IntegerField(_("Duration"), help_text=_("Duration in seconds"))
     

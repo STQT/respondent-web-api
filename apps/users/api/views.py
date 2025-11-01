@@ -21,6 +21,7 @@ from apps.users.models import (
     PositionStaff,
     GTFStaff,
 )
+from apps.users.c1_client import C1Client
 from .serializers import (
     UserSerializer, 
     SendOTPSerializer, 
@@ -615,3 +616,57 @@ class PasswordLoginView(APIView):
             'access': str(access),
             'refresh': str(refresh),
         }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Получить данные сотрудника из 1C",
+    description="""Получает данные сотрудника из системы 1C по PINFL.
+    
+    Используется для автоматического заполнения данных при регистрации.
+    Возвращает полную информацию о сотруднике из 1C.""",
+    tags=["Интеграции"],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'pinfl': {'type': 'string', 'example': '31105912610043'},
+            },
+            'required': ['pinfl']
+        }
+    },
+    responses={
+        200: OpenApiTypes.OBJECT,
+        400: OpenApiTypes.OBJECT,
+        404: OpenApiTypes.OBJECT
+    },
+    examples=[
+        OpenApiExample(
+            name="Успешный запрос",
+            request_only=True,
+            value={"pinfl": "31105912610043"}
+        )
+    ]
+)
+class GetEmployeeFrom1CView(APIView):
+    """Get employee data from 1C system by PINFL."""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        pinfl = request.data.get('pinfl')
+        
+        if not pinfl:
+            return Response({
+                'error': _('PINFL is required')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create 1C client and fetch data
+        client = C1Client()
+        employee_data = client.get_employee_by_pinfl(pinfl)
+        
+        if not employee_data:
+            return Response({
+                'error': _('Employee not found in 1C system')
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Return the data as-is from 1C
+        return Response(employee_data, status=status.HTTP_200_OK)
