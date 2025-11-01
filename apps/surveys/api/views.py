@@ -22,7 +22,7 @@ from apps.surveys.models import (
     Survey, SurveySession, SessionQuestion, Answer, UserSurveyHistory,
     FaceVerification, SessionRecording, ProctorReview, VideoChunk
 )
-from apps.surveys.tasks import create_hls_playlist
+from apps.surveys.tasks import create_hls_playlist, transcode_chunk_to_ts
 from .serializers import (
     SurveyListSerializer, SurveyDetailSerializer, StartSurveySerializer,
     SurveySessionSerializer, SubmitAnswerSerializer, AnswerSerializer,
@@ -2051,6 +2051,9 @@ class ProctorViewSet(GenericViewSet):
         )
         
         total_chunks = session.video_chunks.count()
+        
+        # Start async transcoding to TS format
+        transcode_chunk_to_ts.delay(chunk.id)
         
         return Response({
             'chunk_id': chunk.id,
