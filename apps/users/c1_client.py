@@ -18,7 +18,7 @@ class C1Client:
             'Content-Type': 'application/json',
             'Accept': 'application/json',
         }
-        
+
         if self.basic_token:
             # Basic authentication
             auth_string = f"Basic {self.basic_token}"
