@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from .models import (
     Survey, Question, Choice, SurveySession, 
-    SessionQuestion, Answer, UserSurveyHistory, SurveyEmployeeLevelConfig
+    SessionQuestion, Answer, UserSurveyHistory, SurveyEmployeeLevelConfig,
+    FaceVerification, SessionRecording, VideoChunk, ProctorReview
 )
 
 
@@ -104,24 +105,28 @@ class ChoiceAdmin(admin.ModelAdmin):
 
 @admin.register(SurveySession)
 class SurveySessionAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'user', 'survey', 'status', 'attempt_number', 'score', 'percentage', 'is_passed', 'started_at')
-    list_filter = ('status', 'is_passed', 'survey', 'language', 'started_at')
+    list_display = ('__str__', 'user', 'survey', 'status', 'attempt_number', 'certificate_order', 'score', 'percentage', 'is_passed', 'started_at')
+    list_filter = ('status', 'is_passed', 'survey', 'language', 'started_at', 'flagged_for_review', 'proctoring_enabled')
     search_fields = ('user__name', 'user__phone_number', 'survey__title')
     ordering = ('-started_at',)
     readonly_fields = ('id', 'started_at', 'expires_at', 'duration_minutes')
     
     fieldsets = (
         (_('Session Information'), {
-            'fields': ('id', 'user', 'survey', 'attempt_number', 'language')
+            'fields': ('id', 'user', 'survey', 'attempt_number', 'certificate_order', 'language')
         }),
         (_('Status'), {
-            'fields': ('status', 'can_retake', 'approved_by', 'approved_at')
+            'fields': ('status', 'can_retake', 'retake_reason', 'retake_granted_by', 'approved_by', 'approved_at')
         }),
         (_('Timing'), {
             'fields': ('started_at', 'completed_at', 'expires_at', 'duration_minutes')
         }),
         (_('Results'), {
             'fields': ('score', 'total_points', 'percentage', 'is_passed')
+        }),
+        (_('Proctoring'), {
+            'fields': ('proctoring_enabled', 'initial_face_verified', 'face_reference_image', 'violations_count', 'flagged_for_review'),
+            'classes': ('collapse',)
         }),
     )
     
@@ -146,3 +151,111 @@ class UserSurveyHistoryAdmin(admin.ModelAdmin):
     search_fields = ('user__name', 'user__phone_number', 'survey__title')
     ordering = ('-last_attempt_at',)
     readonly_fields = ('last_attempt_at',)
+
+
+@admin.register(SessionQuestion)
+class SessionQuestionAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'session', 'question', 'order', 'is_answered', 'points_earned')
+    list_filter = ('is_answered', 'session__survey', 'session__status')
+    search_fields = ('session__user__name', 'question__text_uz')
+    ordering = ('session', 'order')
+    
+    fieldsets = (
+        (_('Session Question'), {
+            'fields': ('session', 'question', 'order')
+        }),
+        (_('Progress'), {
+            'fields': ('is_answered', 'points_earned')
+        }),
+    )
+
+
+@admin.register(FaceVerification)
+class FaceVerificationAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'session', 'timestamp', 'face_detected', 'face_count', 'is_violation', 'violation_type')
+    list_filter = ('face_detected', 'is_violation', 'looking_at_screen', 'mobile_device_detected', 'timestamp')
+    search_fields = ('session__user__name', 'session__survey__title', 'violation_type')
+    ordering = ('-timestamp',)
+    readonly_fields = ('timestamp',)
+    
+    fieldsets = (
+        (_('Verification'), {
+            'fields': ('session', 'timestamp', 'face_detected', 'face_count', 'confidence_score')
+        }),
+        (_('Additional Checks'), {
+            'fields': ('looking_at_screen', 'mobile_device_detected')
+        }),
+        (_('Violation'), {
+            'fields': ('is_violation', 'violation_type', 'snapshot'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(SessionRecording)
+class SessionRecordingAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'session', 'uploaded_at', 'duration_seconds', 'file_size', 'processed', 'total_violations')
+    list_filter = ('processed', 'uploaded_at')
+    search_fields = ('session__user__name', 'session__survey__title')
+    ordering = ('-uploaded_at',)
+    readonly_fields = ('uploaded_at',)
+    
+    fieldsets = (
+        (_('Recording'), {
+            'fields': ('session', 'video_file', 'file_size', 'duration_seconds')
+        }),
+        (_('Processing'), {
+            'fields': ('uploaded_at', 'processed')
+        }),
+        (_('Violations'), {
+            'fields': ('total_violations', 'violation_summary'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(VideoChunk)
+class VideoChunkAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'session', 'chunk_number', 'uploaded_at', 'duration_seconds', 'file_size', 'processed')
+    list_filter = ('processed', 'uploaded_at', 'has_audio')
+    search_fields = ('session__user__name', 'session__survey__title')
+    ordering = ('session', 'chunk_number')
+    readonly_fields = ('uploaded_at',)
+    
+    fieldsets = (
+        (_('Chunk Information'), {
+            'fields': ('session', 'chunk_number', 'chunk_file', 'file_size')
+        }),
+        (_('Timing'), {
+            'fields': ('duration_seconds', 'start_time', 'end_time')
+        }),
+        (_('Processing'), {
+            'fields': ('uploaded_at', 'processed')
+        }),
+        (_('Quality Metrics'), {
+            'fields': ('has_audio', 'resolution', 'fps'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ProctorReview)
+class ProctorReviewAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'session', 'reviewer', 'status', 'reviewed_at', 'auto_flagged')
+    list_filter = ('status', 'auto_flagged', 'reviewed_at')
+    search_fields = ('session__user__name', 'session__survey__title', 'notes', 'flag_reason')
+    ordering = ('-session__started_at',)
+    readonly_fields = ('reviewed_at',)
+    
+    fieldsets = (
+        (_('Review'), {
+            'fields': ('session', 'reviewer', 'status', 'reviewed_at')
+        }),
+        (_('Comments'), {
+            'fields': ('notes',)
+        }),
+        (_('Auto-flagging'), {
+            'fields': ('auto_flagged', 'flag_reason'),
+            'classes': ('collapse',)
+        }),
+    )
