@@ -13,7 +13,7 @@ from drf_spectacular.utils import (
 from drf_spectacular.types import OpenApiTypes
 
 from apps.users.models import User
-from apps.surveys.models import Survey, SurveySession, UserSurveyHistory, FaceVerification, ProctorReview
+from apps.surveys.models import Survey, SurveySession, UserSurveyHistory, FaceVerification, ProctorReview, SessionRecording, VideoChunk
 from apps.surveys.permissions import IsModeratorPermission, IsSuperUserOrModeratorPermission
 from .moderator_serializers import (
     ModeratorUserListSerializer,
@@ -746,6 +746,98 @@ class ModeratorUserViewSet(ReadOnlyModelViewSet):
             'status': 'reviewed',
             'review_status': review_status,
             'session_updated': session_updated
+        })
+    
+    @extend_schema(
+        summary="Получить видео-запись сессии",
+        description="""Получить информацию о видео-записи сессии для просмотра модератором.
+        
+        Возвращает информацию о записи, включая ссылки на M3U8 плейлист, видео файлы и чанки.""",
+        tags=["Модераторы"],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "format": "uuid"},
+                    "recording": {
+                        "type": "object",
+                        "properties": {
+                            "playlist_url": {"type": "string", "description": "M3U8 playlist URL"},
+                            "video_file_url": {"type": "string", "description": "Full video file URL (if available)"},
+                            "duration_seconds": {"type": "integer"},
+                            "file_size": {"type": "integer"},
+                            "processed": {"type": "boolean"}
+                        }
+                    },
+                    "chunks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "chunk_number": {"type": "integer"},
+                                "video_url": {"type": "string"},
+                                "duration_seconds": {"type": "number"},
+                                "start_time": {"type": "number"},
+                                "end_time": {"type": "number"}
+                            }
+                        }
+                    }
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "example": "Session or recording not found"}
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='session/(?P<session_id>[^/.]+)/recording')
+    def session_recording(self, request, session_id=None):
+        """Get recording information for a session."""
+        session = get_object_or_404(SurveySession, id=session_id)
+        
+        # Check if recording exists
+        if not hasattr(session, 'recording'):
+            return Response(
+                {'error': _('No recording found for this session')},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        recording = session.recording
+        
+        # Get video chunks
+        chunks = VideoChunk.objects.filter(session=session).order_by('chunk_number')
+        chunks_data = []
+        for chunk in chunks:
+            chunks_data.append({
+                'chunk_number': chunk.chunk_number,
+                'video_url': chunk.chunk_file.url,
+                'duration_seconds': chunk.duration_seconds,
+                'start_time': chunk.start_time,
+                'end_time': chunk.end_time,
+                'uploaded_at': chunk.uploaded_at,
+                'processed': chunk.processed,
+                'has_audio': chunk.has_audio,
+                'resolution': chunk.resolution,
+                'fps': chunk.fps,
+            })
+        
+        recording_data = {
+            'playlist_url': recording.playlist_file.url if recording.playlist_file else None,
+            'video_file_url': recording.video_file.url if recording.video_file else None,
+            'duration_seconds': recording.duration_seconds,
+            'file_size': recording.file_size,
+            'processed': recording.processed,
+            'uploaded_at': recording.uploaded_at,
+            'total_violations': recording.total_violations,
+        }
+        
+        return Response({
+            'session_id': str(session.id),
+            'recording': recording_data,
+            'chunks': chunks_data,
+            'total_chunks': len(chunks_data)
         })
 
 
