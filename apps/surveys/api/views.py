@@ -11,6 +11,8 @@ from django.views import View
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 import requests
+import mimetypes
+import os
 from drf_spectacular.utils import (
     extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
 )
@@ -26,6 +28,74 @@ from .serializers import (
     UserSurveyHistorySerializer, SessionQuestionSerializer, CertificateDataSerializer,
     FaceVerificationSerializer, SessionRecordingSerializer, ProctorReviewSerializer, VideoChunkSerializer
 )
+
+
+def add_file_extension(file_obj):
+    """
+    Add proper file extension based on MIME type if file doesn't have one.
+    
+    Args:
+        file_obj: Django UploadedFile object
+        
+    Returns:
+        file_obj with proper extension
+    """
+    if not file_obj or not file_obj.name:
+        return file_obj
+    
+    # Check if file already has a valid extension
+    _, ext = os.path.splitext(file_obj.name)
+    if ext and len(ext) > 1:  # Has valid extension
+        return file_obj
+    
+    # Get MIME type and determine extension
+    content_type = file_obj.content_type
+    if content_type:
+        # Handle common MIME types
+        mime_to_ext = {
+            'image/jpeg': '.jpg',
+            'image/jpg': '.jpg',
+            'image/png': '.png',
+            'image/gif': '.gif',
+            'image/webp': '.webp',
+            'video/webm': '.webm',
+            'video/mp4': '.mp4',
+            'video/x-msvideo': '.avi',
+            'video/quicktime': '.mov',
+            'application/octet-stream': '.bin',  # Fallback
+        }
+        
+        if content_type in mime_to_ext:
+            ext = mime_to_ext[content_type]
+        else:
+            # Try to get extension from mimetypes module
+            ext = mimetypes.guess_extension(content_type) or ''
+        
+        if ext:
+            # Add extension to filename if it doesn't have one
+            file_obj.name = f"{file_obj.name}{ext}"
+    
+    return file_obj
+
+
+def to_boolean(value, default=False):
+    """
+    Convert value to boolean, handling string representations.
+    
+    Args:
+        value: Value to convert (can be bool, str, int, etc.)
+        default: Default value if conversion fails
+        
+    Returns:
+        bool value
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in ('true', '1', 'yes', 'on')
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
 
 
 @extend_schema_view(
@@ -1710,6 +1780,9 @@ class ProctorViewSet(GenericViewSet):
         
         session = get_object_or_404(SurveySession, id=session_id, user=request.user)
         
+        # Add proper file extension if missing
+        face_image = add_file_extension(face_image)
+        
         # Save reference image
         session.face_reference_image = face_image
         session.initial_face_verified = True
@@ -1762,13 +1835,17 @@ class ProctorViewSet(GenericViewSet):
         
         session = get_object_or_404(SurveySession, id=session_id, user=request.user)
         
-        # Prepare metadata
+        # Add proper file extension if missing
+        if snapshot:
+            snapshot = add_file_extension(snapshot)
+        
+        # Prepare metadata with proper boolean conversion
         metadata = {
-            'face_detected': request.data.get('face_detected', False),
+            'face_detected': to_boolean(request.data.get('face_detected'), False),
             'face_count': int(request.data.get('face_count', 0)),
             'confidence_score': float(request.data.get('confidence_score')) if request.data.get('confidence_score') else None,
-            'looking_at_screen': request.data.get('looking_at_screen', True),
-            'mobile_device_detected': request.data.get('mobile_detected', False)
+            'looking_at_screen': to_boolean(request.data.get('looking_at_screen'), True),
+            'mobile_device_detected': to_boolean(request.data.get('mobile_detected'), False)
         }
         
         violation = session.record_violation(
@@ -1826,14 +1903,14 @@ class ProctorViewSet(GenericViewSet):
         
         session = get_object_or_404(SurveySession, id=session_id, user=request.user)
         
-        # Create verification record
+        # Create verification record with proper boolean conversion
         FaceVerification.objects.create(
             session=session,
-            face_detected=face_data.get('face_detected', False),
+            face_detected=to_boolean(face_data.get('face_detected'), False),
             face_count=face_data.get('face_count', 0),
             confidence_score=face_data.get('confidence'),
-            looking_at_screen=face_data.get('looking_at_screen', True),
-            mobile_device_detected=face_data.get('mobile_detected', False)
+            looking_at_screen=to_boolean(face_data.get('looking_at_screen'), True),
+            mobile_device_detected=to_boolean(face_data.get('mobile_detected'), False)
         )
         
         return Response({'status': 'ok'})
@@ -1876,6 +1953,9 @@ class ProctorViewSet(GenericViewSet):
             )
         
         session = get_object_or_404(SurveySession, id=session_id, user=request.user)
+        
+        # Add proper file extension if missing
+        video_file = add_file_extension(video_file)
         
         recording = SessionRecording.objects.create(
             session=session,
@@ -1939,6 +2019,9 @@ class ProctorViewSet(GenericViewSet):
         
         session = get_object_or_404(SurveySession, id=session_id, user=request.user)
         
+        # Add proper file extension if missing
+        video_chunk = add_file_extension(video_chunk)
+        
         chunk = VideoChunk.objects.create(
             session=session,
             chunk_number=int(chunk_number),
@@ -1947,7 +2030,7 @@ class ProctorViewSet(GenericViewSet):
             duration_seconds=float(duration_seconds),
             start_time=float(start_time),
             end_time=float(end_time),
-            has_audio=request.data.get('has_audio', True),
+            has_audio=to_boolean(request.data.get('has_audio', True), True),
             resolution=request.data.get('resolution', ''),
             fps=int(request.data.get('fps')) if request.data.get('fps') else None
         )
